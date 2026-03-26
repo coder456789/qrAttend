@@ -1,12 +1,12 @@
 # QR-Attend — File Specification Guide
-### What Each File Must Contain & Do
+### What Each File Must Contain & Do (Simplified 58-File Structure)
 
-> This document describes every file in the repo (original 80-file structure).
+> This document describes every file in the repo.
 > Use it as a reference when coding — each file has its purpose, inputs, outputs, and key methods listed.
 
 ---
 
-## 🔵 MEMBER 1 — UI / Frontend (20 Java + 20 XML)
+## 🔵 MEMBER 1 — UI / Frontend (14 Activities + 3 Adapters + 17 XML)
 
 ---
 
@@ -133,7 +133,7 @@
 | Student list | All docs from `attendanceSessions/{sessionId}/records/` |
 | Each row shows | Student name, roll no, time marked, status (present/rejected) |
 | Flagged entries | Highlight rejected ones with reason |
-| Adapter | `StudentListAdapter` (or `AttendanceRecordAdapter`) |
+| Adapter | `AttendanceRecordAdapter` |
 | XML | RecyclerView, session info header (date, subject, total count) |
 
 ---
@@ -143,28 +143,26 @@
 
 | What it shows | Details |
 |---|---|
-| Cards/buttons | "Manage Students", "Manage Teachers", "Manage Classes" |
+| Cards/buttons | "Manage Users", "Manage Classes" |
 | Stats overview | Total students, total teachers, total classes |
 | XML | Grid of cards with icons and counts |
 
 ---
 
-### `ManageStudentsActivity.java` + `activity_manage_students.xml`
-**Purpose:** Admin views/adds/edits/deletes students.
+### `ManageUsersActivity.java` + `activity_manage_users.xml`
+**Purpose:** Admin views/adds/edits/deletes students AND teachers (tab/toggle to switch).
 
 | What it does | Details |
 |---|---|
-| List all students | Read `students` collection |
-| Add student | Dialog/form → `StudentRepository.addStudent()` |
-| Edit student | Tap row → edit dialog → `StudentRepository.updateStudent()` |
-| Delete student | Swipe/long-press → `StudentRepository.deleteStudent()` |
-| Adapter | `StudentListAdapter` |
-| XML | RecyclerView, FAB "Add Student", search bar |
+| Tab: Students | List all students from `students` collection |
+| Tab: Teachers | List all teachers from `teachers` collection |
+| Add | Dialog/form → `StudentRepository.addStudent()` or `TeacherRepository.addTeacher()` |
+| Edit | Tap row → edit dialog → update Firestore |
+| Delete | Swipe/long-press → delete from Firestore |
+| Adapter | `UserListAdapter` (reused for both) |
+| XML | TabLayout (Students / Teachers), RecyclerView, FAB "Add", search bar |
 
----
-
-### `ManageTeachersActivity.java` + `activity_manage_teachers.xml`
-**Purpose:** Same as ManageStudents but for teachers. Identical pattern.
+> **Note:** This replaces the old `ManageStudentsActivity` + `ManageTeachersActivity`. Same screen, different data.
 
 ---
 
@@ -176,38 +174,28 @@
 | List classes | Read `classes` collection |
 | Add class | Form: className, subject, assign teacher (dropdown from `teachers`) |
 | Enroll students | Multi-select students to add to `enrolledStudents` array |
-| Adapter | `CourseListAdapter` |
+| Adapter | `ClassListAdapter` |
 | XML | RecyclerView, FAB "Add Class" |
 
 ---
 
-### `ProfileActivity.java` + `activity_profile.xml`
-**Purpose:** View and edit own profile (name, phone, email).
-
-| What it does | Details |
-|---|---|
-| Show current info | Read from `students/{uid}` or `teachers/{uid}` |
-| Edit fields | Name, phone (email is read-only — Firebase Auth) |
-| Save | Update Firestore doc |
-| Device info | Show registered deviceId(s) |
-| XML | Avatar placeholder, EditTexts, Save button, device info section |
-
----
-
 ### `SettingsActivity.java` + `activity_settings.xml`
-**Purpose:** App settings and logout.
+**Purpose:** App settings, profile editing, and logout.
 
 | What it shows | Details |
 |---|---|
+| Profile section | Name, phone, email (read-only), device info — edit + save |
 | Notification toggle | Enable/disable push notifications |
 | Dark mode toggle | Switch theme |
 | About section | App version, developers |
 | Logout button | `AuthManager.logout()` → go to LoginActivity |
-| XML | List of setting items with toggles, Logout button at bottom |
+| XML | Profile card at top, list of setting items with toggles, Logout button at bottom |
+
+> **Note:** This replaces the old `ProfileActivity` + `SettingsActivity`. Profile editing is now a section inside Settings.
 
 ---
 
-### Adapters
+### Adapters (3 files)
 
 #### `AttendanceRecordAdapter.java` + `item_attendance_record.xml`
 | What it renders | One row of attendance history |
@@ -215,29 +203,27 @@
 | Data | Date, subject name, status (colored badge: green=present, red=rejected), time |
 | XML | Horizontal row: date text, subject text, status chip, time text |
 
-#### `StudentListAdapter.java` + `item_student.xml`
-| What it renders | One row of student in a list |
+#### `UserListAdapter.java` + `item_user.xml`
+| What it renders | One row of student OR teacher in a list |
 |---|---|
-| Data | Name, roll number, class, email |
+| Data | Name, role indicator, email, roll no (students) or subject (teachers) |
 | Click action | Opens edit dialog or detail view |
-| XML | Horizontal row: avatar circle, name, roll no, class badge |
+| XML | Horizontal row: avatar circle, name, info text, role badge |
 
-#### `CourseListAdapter.java` + `item_course.xml`
-| What it renders | One row of class/course |
-|---|---|
-| Data | Class name, subject, teacher name |
-| XML | Card with subject name, class name, teacher chip |
+> **Note:** Replaces old `StudentListAdapter` + `CourseListAdapter`. Reused for both students and teachers.
 
-#### `SessionListAdapter.java` + `item_session.xml`
-| What it renders | One row of past session |
+#### `ClassListAdapter.java` + `item_class.xml`
+| What it renders | One row of class/course OR past session |
 |---|---|
-| Data | Date, subject, attendance count (e.g., "42/60"), status |
-| Click action | Opens `SessionAttendanceActivity` |
-| XML | Card: date, subject, attendance bar/count |
+| Data | Class name, subject, teacher name OR date + attendance count |
+| Click action | Opens detail view or `SessionAttendanceActivity` |
+| XML | Card with subject name, class name, info chip |
+
+> **Note:** Replaces old `CourseListAdapter` + `SessionListAdapter`. Reused for both.
 
 ---
 
-## 🟢 MEMBER 2 — Core Logic (10 Java Files)
+## 🟢 MEMBER 2 — Core Logic (7 Java Files)
 
 ---
 
@@ -245,7 +231,6 @@
 **Purpose:** Generate QR code bitmap from encrypted payload using ZXing.
 
 ```java
-// Key methods:
 public class QRGeneratorUtil {
 
     // Generate QR bitmap from encrypted string
@@ -345,7 +330,7 @@ public class AESCryptoUtil {
 ---
 
 ### `DeviceFingerprint.java`
-**Purpose:** Collect unique device identifiers to prevent proxy attendance.
+**Purpose:** Collect unique device identifiers AND detect rooted/emulator devices.
 
 ```java
 public class DeviceFingerprint {
@@ -365,13 +350,29 @@ public class DeviceFingerprint {
     // Input: expected fingerprint from Firestore student doc
     // Output: true if match, false if different device
     public static boolean matches(String expectedFP, Context context);
+    
+    // === MERGED FROM IntegrityChecker.java ===
+    
+    // Check if device is rooted (su binary, Magisk, SuperSU)
+    public static boolean isRooted();
+    
+    // Check if running on emulator (Build.FINGERPRINT "generic")
+    public static boolean isEmulator();
+    
+    // Check if APK signature is valid (not repackaged)
+    public static boolean isAPKTampered(Context context);
+    
+    // All-in-one: fingerprint match + root + emulator + APK check
+    public static boolean isDeviceTrusted(Context context);
 }
 ```
+
+> **Note:** This now includes root/emulator detection (merged from old `IntegrityChecker.java`).
 
 ---
 
 ### `NonceManager.java`
-**Purpose:** Generate random one-time nonces and validate scanned nonces.
+**Purpose:** Generate random one-time nonces and validate scanned nonces. **No Firestore involved — pure local logic.**
 
 ```java
 public class NonceManager {
@@ -389,41 +390,13 @@ public class NonceManager {
 
 ---
 
-### `IntegrityChecker.java`
-**Purpose:** Detect rooted devices, emulators, and tampered APKs.
+### `GeoValidator.java`
+**Purpose:** Check if student is within classroom geofence AND detect mock/fake GPS.
 
 ```java
-public class IntegrityChecker {
+public class GeoValidator {
 
-    // Check if device is rooted
-    // Looks for: su binary, Magisk, SuperSU, system/xbin/su
-    public static boolean isRooted();
-    
-    // Check if running on emulator
-    // Checks: Build.FINGERPRINT contains "generic", Build.MODEL contains "Emulator"
-    public static boolean isEmulator();
-    
-    // Check if APK signature is valid (not repackaged)
-    // Compares against your known signing certificate hash
-    public static boolean isAPKTampered(Context context);
-    
-    // All-in-one check
-    // Returns: true if device is safe, false if any check fails
-    public static boolean isDeviceTrusted(Context context);
-}
-```
-
----
-
-### `LocationHelper.java`
-**Purpose:** Get current GPS location using Fused Location Provider.
-
-```java
-public class LocationHelper {
-
-    // Request single location update (high accuracy)
-    // Input: activity (for permission check), callback
-    // Output: Location object with lat/lng via callback
+    // Get current GPS location (Fused Location Provider)
     public void getCurrentLocation(Activity activity, OnLocationResultListener callback);
     
     // Check if location permissions are granted
@@ -431,23 +404,6 @@ public class LocationHelper {
     
     // Request location permissions
     public static void requestPermission(Activity activity, int requestCode);
-    
-    public interface OnLocationResultListener {
-        void onLocation(double latitude, double longitude);
-        void onError(String error);
-    }
-}
-```
-
-**Dependencies:** `com.google.android.gms:play-services-location`
-
----
-
-### `GeoValidator.java`
-**Purpose:** Check if student is within classroom geofence.
-
-```java
-public class GeoValidator {
 
     // Calculate distance between two GPS points (Haversine formula)
     // Input: student lat/lng, classroom lat/lng
@@ -460,30 +416,30 @@ public class GeoValidator {
     public static boolean isWithinGeofence(double studentLat, double studentLng,
                                             double classLat, double classLng,
                                             double radiusMeters);
-}
-```
-
----
-
-### `MockLocationDetector.java`
-**Purpose:** Detect if the student is using a fake GPS app.
-
-```java
-public class MockLocationDetector {
-
+    
+    // === MERGED FROM LocationHelper.java + MockLocationDetector.java ===
+    
     // Check if location is from a mock provider
-    // Input: Location object
-    // Output: true if MOCK (reject attendance)
     public static boolean isMockLocation(Location location);
     
     // Check if any mock location apps are installed
-    // Scans installed apps for known fake GPS packages
     public static boolean hasMockAppsInstalled(Context context);
     
-    // Combined check
-    public static boolean isSpoofed(Location location, Context context);
+    // Combined: mock check + geofence check
+    public static boolean isLocationValid(Location studentLocation,
+                                           double classLat, double classLng,
+                                           double radiusMeters, Context context);
+    
+    public interface OnLocationResultListener {
+        void onLocation(double latitude, double longitude);
+        void onError(String error);
+    }
 }
 ```
+
+> **Note:** This now includes location fetching (from `LocationHelper`) and mock detection (from `MockLocationDetector`).
+
+**Dependencies:** `com.google.android.gms:play-services-location`
 
 ---
 
@@ -501,12 +457,11 @@ public class ProxyDetectionEngine {
                          ValidationCallback callback);
     
     // Validation order:
-    // 1. IntegrityChecker.isDeviceTrusted()     → reject if rooted/emulator
+    // 1. DeviceFingerprint.isDeviceTrusted()     → reject if rooted/emulator
     // 2. NonceManager.isValid(scannedNonce, sessionNonce) → reject if QR expired
     // 3. DeviceFingerprint.matches()             → reject if wrong device
-    // 4. MockLocationDetector.isSpoofed()        → reject if fake GPS
-    // 5. GeoValidator.isWithinGeofence()          → reject if outside classroom
-    // 6. ALL PASS → return ValidationResult.SUCCESS
+    // 4. GeoValidator.isLocationValid()           → reject if fake GPS or outside classroom
+    // 5. ALL PASS → return ValidationResult.SUCCESS
     
     public class ValidationResult {
         public boolean passed;
@@ -521,7 +476,7 @@ public class ProxyDetectionEngine {
 
 ---
 
-## 🟠 MEMBER 3 — Backend / Firebase (16 Java + 3 config)
+## 🟠 MEMBER 3 — Backend / Firebase (5 Models + 5 Repos + 2 Firebase = 12 Java + 2 Config)
 
 ---
 
@@ -590,12 +545,6 @@ public class AttendanceRecord {
     private double deviceLocationLong;
     private String rejectionReason;     // "" | "location_mismatch" | "device_mismatch" | "nonce_expired"
 }
-```
-
-#### `NonceLog.java`
-```java
-// ⚠️ THIS FILE IS NO LONGER NEEDED — nonce validation uses session's qrCode field directly.
-// Kept here for documentation only. DO NOT CREATE THIS FILE.
 ```
 
 ---
@@ -675,6 +624,8 @@ public class SessionRepository {
 }
 ```
 
+> **Note:** Nonce validation is handled here — no separate `NonceRepository` needed.
+
 #### `AttendanceRepository.java`
 ```java
 public class AttendanceRepository {
@@ -695,13 +646,6 @@ public class AttendanceRepository {
     // This requires querying multiple sessions — use collectionGroup query
     void getStudentHistory(String studentId, OnSuccessListener<List<AttendanceRecord>> callback);
 }
-```
-
-#### `NonceRepository.java`
-```java
-// ⚠️ THIS FILE IS NO LONGER NEEDED — nonce validation moved to SessionRepository.
-// The session's qrCode field IS the current nonce. Just compare scanned vs stored.
-// DO NOT CREATE THIS FILE.
 ```
 
 ---
@@ -758,23 +702,6 @@ public class FCMService extends FirebaseMessagingService {
 }
 ```
 
-#### `FirestoreHelper.java`
-```java
-public class FirestoreHelper {
-    // Singleton Firestore instance
-    public static FirebaseFirestore db = FirebaseFirestore.getInstance();
-    
-    // Common query: get document by ID from any collection
-    public static void getDocument(String collection, String docId, OnSuccessListener callback);
-    
-    // Common: check if document exists
-    public static void exists(String collection, String docId, OnSuccessListener<Boolean> callback);
-    
-    // Timestamp helper
-    public static Timestamp now();
-}
-```
-
 ---
 
 ### Utils (Shared)
@@ -805,36 +732,6 @@ public class Constants {
 }
 ```
 
-#### `TimeUtils.java`
-```java
-public class TimeUtils {
-    // Format Firestore Timestamp to "23 Mar 2026, 10:30 AM"
-    public static String formatDateTime(Timestamp ts);
-    
-    // Format to date only: "23 Mar 2026"
-    public static String formatDate(Timestamp ts);
-    
-    // Format to time only: "10:30 AM"
-    public static String formatTime(Timestamp ts);
-    
-    // Generate readable session ID: "session_2026_03_23_10AM"
-    public static String generateSessionId();
-}
-```
-
-#### `ExportUtil.java`
-```java
-public class ExportUtil {
-    // Export attendance data to CSV file
-    // Input: list of AttendanceRecords, file name
-    // Output: CSV file saved to device Downloads folder
-    public static File exportToCSV(List<AttendanceRecord> records, String fileName);
-    
-    // Export to PDF (using Android's print framework or iText library)
-    public static File exportToPDF(List<AttendanceRecord> records, String fileName);
-}
-```
-
 ---
 
 ### Config Files
@@ -851,14 +748,8 @@ service cloud.firestore {
 }
 ```
 
-#### `firestore.indexes.json`
-Composite indexes for common queries (e.g., sessions by classId + active).
-
 #### `SETUP.md`
 Step-by-step Firebase setup guide for team members.
-
-#### `CONTRIBUTING.md`
-Git branching strategy, commit conventions, PR process.
 
 ---
 
@@ -866,7 +757,6 @@ Git branching strategy, commit conventions, PR process.
 
 | File | Purpose |
 |---|---|
-| `QRAttendApp.java` | Custom Application class (initialize Firebase, etc.) |
 | `AndroidManifest.xml` | Declares all Activities, permissions (CAMERA, LOCATION, INTERNET) |
 | `.gitignore` | Ignores build files, local.properties, google-services.json |
 | `README.md` | Project overview, tech stack, setup instructions link |
@@ -874,3 +764,20 @@ Git branching strategy, commit conventions, PR process.
 | `build.gradle` (app) | Dependencies (Firebase, ZXing, ML Kit, Play Services Location) |
 | `settings.gradle` | Module includes |
 | `gradle.properties` | JVM args, AndroidX settings |
+
+---
+
+## Summary: What Was Merged
+
+| Old File | Now Part Of | Reason |
+|---|---|---|
+| `ProfileActivity` + XML | `SettingsActivity` | Profile editing is just a section in settings |
+| `ManageStudentsActivity` + `ManageTeachersActivity` | `ManageUsersActivity` | Same screen, tab/toggle to switch |
+| `IntegrityChecker.java` | `DeviceFingerprint.java` | Root/emulator check is part of fingerprinting |
+| `LocationHelper.java` + `MockLocationDetector.java` | `GeoValidator.java` | All location logic in one file |
+| `FirestoreHelper.java` | Individual repositories | Each repo handles its own Firestore instance |
+| `NonceLog.java` + `NonceRepository.java` | `SessionRepository` | No separate nonce collection needed |
+| `ExportUtil.java` + `TimeUtils.java` | Deferred to v1.1 | Not essential for v1.0 |
+| `StudentListAdapter` + `CourseListAdapter` + `SessionListAdapter` | `UserListAdapter` + `ClassListAdapter` | Reusable with different data |
+| `QRAttendApp.java` | Removed | No custom Application class for v1.0 |
+| `CONTRIBUTING.md` + `firestore.indexes.json` + `dimens.xml` | Removed | Not needed for 3-person team |
