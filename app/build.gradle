@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
+    id 'com.google.gms.google-services'
 }
 
 android {
@@ -40,4 +41,21 @@ dependencies {
     testImplementation libs.junit
     androidTestImplementation libs.ext.junit
     androidTestImplementation libs.espresso.core
+    implementation platform('com.google.firebase:firebase-bom:32.0.0')
+    // Firebase Backend
+    implementation 'com.google.firebase:firebase-auth'
+    implementation 'com.google.firebase:firebase-firestore'
+    implementation 'com.google.firebase:firebase-messaging' // For push notifications later
+    implementation 'com.google.firebase:firebase-analytics'
+    implementation 'com.google.firebase:firebase-crashlytics' //crashalytics pluggin to be added later
+
+    //Core Logic & QR
+    // QR Generator (ZXing)
+    implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
+
+    // QR Scanner (Google ML Kit)
+    implementation 'com.google.mlkit:barcode-scanning:17.2.0'
+
+    // Location Services (For your Geofence checks)
+    implementation 'com.google.android.gms:play-services-location:21.1.0'
 }

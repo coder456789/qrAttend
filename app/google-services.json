@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "798137783876",
+    "project_id": "attendance-management-88bce",
+    "storage_bucket": "attendance-management-88bce.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:798137783876:android:fd4a0ae21392981c840e11",
+        "android_client_info": {
+          "package_name": "com.qrattend.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCEpm9WrymFcblLlchhFm1t4D4WlnBWKL0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
