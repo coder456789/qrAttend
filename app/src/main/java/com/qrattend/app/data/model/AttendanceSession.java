@@ -66,7 +66,7 @@ public class AttendanceSession {
                              String qrCode, double latitude, double longitude,
                              double geofenceRadius, Timestamp startTime, Timestamp endTime, boolean active) {
         this.classId = classId;
-        this.className = className;
+        this.className = className; 
         this.subject = subject;
         this.teacherId = teacherId;
         this.qrCode = qrCode;
