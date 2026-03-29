@@ -46,7 +46,7 @@ public class AttendanceSession {
 
     /** Timestamp when the session was started. */
     private Timestamp startTime;
-
+    private String sessionKey;
     /** Timestamp when the session ended; {@code null} while the session is active. */
     private Timestamp endTime;
 
@@ -63,26 +63,29 @@ public class AttendanceSession {
      * Full constructor for creating new AttendanceSession instances.
      */
     public AttendanceSession(String classId, String className, String subject, String teacherId,
-                             String qrCode, double latitude, double longitude,
+                             String qrCode,String sessionKey, double latitude, double longitude,
                              double geofenceRadius, Timestamp startTime, Timestamp endTime, boolean active) {
         this.classId = classId;
         this.className = className; 
         this.subject = subject;
         this.teacherId = teacherId;
         this.qrCode = qrCode;
+        this.sessionKey = sessionKey;
         this.latitude = latitude;
         this.longitude = longitude;
         this.geofenceRadius = geofenceRadius;
         this.startTime = startTime;
         this.endTime = endTime;
         this.active = active;
+
     }
 
     // ── Getters and Setters ─────────────────────────────────────────────
 
     public String getSessionId() { return sessionId; }
     public void setSessionId(String sessionId) { this.sessionId = sessionId; }
-
+    public String getSessionKey() { return sessionKey; }
+    public void setSessionKey(String sessionKey) { this.sessionKey = sessionKey; }
     public String getClassId() { return classId; }
     public void setClassId(String classId) { this.classId = classId; }
 
