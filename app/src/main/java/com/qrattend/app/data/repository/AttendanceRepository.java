@@ -12,6 +12,7 @@ import com.qrattend.app.data.model.AttendanceRecord;
 import com.qrattend.app.utils.Constants;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 /**
@@ -50,7 +51,23 @@ public class AttendanceRepository {
                 .set(record)
                 .addOnCompleteListener(callback);
     }
-
+    /**
+     * Allows a teacher to manually override a student's attendance status.
+     * This is used for GPS glitches or physical verification.
+     */
+    public void manuallyMarkPresent(@NonNull String sessionId,
+                                    @NonNull String studentId,
+                                    @NonNull OnCompleteListener<Void> listener) {
+        // Use your helper method getRecordsRef to reach the subcollection
+        getRecordsRef(sessionId)
+                .document(studentId)
+                .set(new HashMap<String, Object>() {{
+                    put("status", "Present");
+                    put("markedManually", true);
+                    put("timestamp", com.google.firebase.Timestamp.now());
+                }}, com.google.firebase.firestore.SetOptions.merge())
+                .addOnCompleteListener(listener);
+    }
     // ── Read ────────────────────────────────────────────────────────────
 
     /**

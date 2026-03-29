@@ -94,12 +94,19 @@ public class SessionRepository {
     // ── Nonce / QR Update ───────────────────────────────────────────────
 
     /**
-     * Updates the current QR nonce for a session.
+     * Updates both the QR nonce and the secret session key simultaneously.
+     * This ensures the "handshake" between student and teacher is always fresh.
      */
-    public void updateNonce(@NonNull String sessionId, @NonNull String newNonce,
-                            @NonNull OnCompleteListener<Void> callback) {
+    public void updateSecureNonce(@NonNull String sessionId,
+                                  @NonNull String newNonce,
+                                  @NonNull String newSessionKey,
+                                  @NonNull OnCompleteListener<Void> callback) {
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("qrCode", newNonce);
+        updates.put("sessionKey", newSessionKey);
+
         sessionsRef.document(sessionId)
-                .update("qrCode", newNonce)
+                .update(updates)
                 .addOnCompleteListener(callback);
     }
 
@@ -140,24 +147,7 @@ public class SessionRepository {
                 });
     }
 
-    /**
-     * Allows a teacher to manually override a student's attendance status.
-     * This is used for GPS glitches or physical verification.
-     */
-    public void manuallyMarkPresent(@NonNull String sessionId,
-                                    @NonNull String studentId,
-                                    @NonNull OnCompleteListener<Void> listener) {
-        // Use sessionsRef instead of db
-        sessionsRef.document(sessionId)
-                .collection(Constants.RECORDS)
-                .document(studentId)
-                .set(new HashMap<String, Object>() {{
-                    put("status", "Present");
-                    put("markedManually", true);
-                    put("timestamp", com.google.firebase.Timestamp.now());
-                }}, com.google.firebase.firestore.SetOptions.merge())
-                .addOnCompleteListener(listener);
-    }
+
     /**
      * Callback interface for real-time attendance count updates.
      */
