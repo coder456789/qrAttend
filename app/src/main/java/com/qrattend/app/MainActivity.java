@@ -1,20 +1,22 @@
 package com.qrattend.app;
 
 import android.os.Bundle;
-import android.widget.Toast;
+import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
+
 import com.google.firebase.FirebaseApp;
+import com.google.firebase.Timestamp;
+import com.qrattend.app.data.model.AttendanceSession;
+import com.qrattend.app.data.repository.SessionRepository;
+import com.qrattend.app.R;
+
+import java.util.UUID;
 
 public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main); // This line links to your UI
 
-        // Initialize Firebase
-        FirebaseApp.initializeApp(this);
-
-        // If the app reaches this line without crashing, you win!
-        Toast.makeText(this, "Firebase Connected Successfully!", Toast.LENGTH_LONG).show();
     }
 }

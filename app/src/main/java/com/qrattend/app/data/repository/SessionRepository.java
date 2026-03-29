@@ -141,6 +141,24 @@ public class SessionRepository {
     }
 
     /**
+     * Allows a teacher to manually override a student's attendance status.
+     * This is used for GPS glitches or physical verification.
+     */
+    public void manuallyMarkPresent(@NonNull String sessionId,
+                                    @NonNull String studentId,
+                                    @NonNull OnCompleteListener<Void> listener) {
+        // Use sessionsRef instead of db
+        sessionsRef.document(sessionId)
+                .collection(Constants.RECORDS)
+                .document(studentId)
+                .set(new HashMap<String, Object>() {{
+                    put("status", "Present");
+                    put("markedManually", true);
+                    put("timestamp", com.google.firebase.Timestamp.now());
+                }}, com.google.firebase.firestore.SetOptions.merge())
+                .addOnCompleteListener(listener);
+    }
+    /**
      * Callback interface for real-time attendance count updates.
      */
     public interface OnCountChangedListener {

@@ -233,9 +233,17 @@ public class AuthManager {
                                         cacheRole(context, uid, Constants.ROLE_TEACHER);
                                         callback.onSuccess(Constants.ROLE_TEACHER);
                                     } else {
-                                        // Default to admin
-                                        cacheRole(context, uid, Constants.ROLE_ADMIN);
-                                        callback.onSuccess(Constants.ROLE_ADMIN);
+                                        // Check admins collection explicitly
+                                        db.collection("admins").document(uid).get().addOnSuccessListener(adminDoc -> {
+                                            if (adminDoc.exists()) {
+                                                cacheRole(context, uid, Constants.ROLE_ADMIN);
+                                                callback.onSuccess(Constants.ROLE_ADMIN);
+                                            } else {
+                                                //No role found? Sign them out!
+                                                logout(context);
+                                                callback.onSuccess("unauthorized");
+                                            }
+                                        });
                                     }
                                 })
                                 .addOnFailureListener(e -> {
