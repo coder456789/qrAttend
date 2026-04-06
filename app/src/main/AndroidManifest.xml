@@ -24,14 +24,60 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.QrAttend">
 
+        <!-- Splash Screen (LAUNCHER) -->
         <activity
-            android:name=".MainActivity"
-            android:exported="true">
+            android:name=".ui.SplashActivity"
+            android:exported="true"
+            android:theme="@style/Theme.QrAttend.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Auth -->
+        <activity android:name=".ui.LoginActivity"
+            android:exported="false" />
+        <activity android:name=".ui.SignupActivity"
+            android:exported="false" />
+
+        <!-- Student -->
+        <activity android:name=".ui.StudentDashboardActivity"
+            android:exported="false" />
+        <activity android:name=".ui.AttendanceHistoryActivity"
+            android:exported="false" />
+        <activity android:name=".ui.ScanQRActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <!-- Teacher -->
+        <activity android:name=".ui.TeacherDashboardActivity"
+            android:exported="false" />
+        <activity android:name=".ui.StartSessionActivity"
+            android:exported="false" />
+        <activity android:name=".ui.DisplayQRActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:keepScreenOn="true" />
+        <activity android:name=".ui.SessionAttendanceActivity"
+            android:exported="false" />
+
+        <!-- Admin -->
+        <activity android:name=".ui.AdminDashboardActivity"
+            android:exported="false" />
+        <activity android:name=".ui.ManageUsersActivity"
+            android:exported="false" />
+        <activity android:name=".ui.ManageClassesActivity"
+            android:exported="false" />
+
+        <!-- Shared -->
+        <activity android:name=".ui.SettingsActivity"
+            android:exported="false" />
+
+        <!-- Keep original MainActivity as fallback -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false" />
 
         <!-- Firebase Cloud Messaging service for push notifications -->
         <service

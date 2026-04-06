@@ -1,5 +1,49 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Brand Colors -->
+    <color name="primary">#1565C0</color>
+    <color name="primaryDark">#0D47A1</color>
+    <color name="primaryLight">#42A5F5</color>
+    <color name="accent">#00BCD4</color>
+
+    <!-- Status Colors -->
+    <color name="success">#4CAF50</color>
+    <color name="error">#F44336</color>
+    <color name="warning">#FF9800</color>
+
+    <!-- Text Colors -->
+    <color name="textPrimary">#212121</color>
+    <color name="textSecondary">#757575</color>
+    <color name="textOnPrimary">#FFFFFF</color>
+
+    <!-- Surface Colors -->
+    <color name="background">#FAFAFA</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="divider">#BDBDBD</color>
+
+    <!-- Attendance Status -->
+    <color name="statusPresent">#4CAF50</color>
+    <color name="statusRejected">#F44336</color>
+
+    <!-- Attendance Thresholds -->
+    <color name="attendanceHigh">#388E3C</color>
+    <color name="attendanceMid">#F57C00</color>
+    <color name="attendanceLow">#D32F2F</color>
+
+    <!-- Splash Gradient -->
+    <color name="splashStart">#0D47A1</color>
+    <color name="splashEnd">#1565C0</color>
+
+    <!-- Misc -->
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="chipBackground">#E3F2FD</color>
+    <color name="cardStroke">#E0E0E0</color>
+    <color name="overlay">#80000000</color>
+    <color name="scannerBackground">#000000</color>
+    <color name="qrDisplayBackground">#1A1A2E</color>
+    <color name="adminCardManageUsers">#E3F2FD</color>
+    <color name="adminCardManageClasses">#E8F5E9</color>
+    <color name="avatarBackground">#BBDEFB</color>
+    <color name="avatarText">#0D47A1</color>
 </resources>
