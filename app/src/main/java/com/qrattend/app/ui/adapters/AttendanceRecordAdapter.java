@@ -8,7 +8,6 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.android.material.chip.Chip;
 import com.qrattend.app.R;
 import com.qrattend.app.data.model.AttendanceRecord;
 import com.qrattend.app.utils.Constants;
@@ -48,28 +47,20 @@ public class AttendanceRecordAdapter extends RecyclerView.Adapter<AttendanceReco
             holder.tvDate.setText("—");
         }
 
-        // Session ID
-        String sessionId = record.getSessionId();
-        holder.tvSession.setText(sessionId != null ? sessionId : "");
+        // Subject (using session ID for now as fallback)
+        String subject = record.getSessionId();
+        holder.tvSubject.setText(subject != null ? subject : "Unknown Class");
 
-        // Status chip
+        // Status
         String status = record.getStatus();
         if (Constants.STATUS_PRESENT.equals(status)) {
-            holder.chipStatus.setText(R.string.filter_present);
-            holder.chipStatus.setChipBackgroundColorResource(R.color.statusPresent);
-            holder.chipStatus.setTextColor(holder.itemView.getContext().getResources().getColor(R.color.white));
-            holder.tvRejectionReason.setVisibility(View.GONE);
+            holder.tvStatus.setText(R.string.filter_present);
+            holder.tvStatus.setTextColor(holder.itemView.getContext().getResources().getColor(R.color.statusPresent));
+            holder.viewStatusDot.setBackgroundResource(R.color.statusPresent);
         } else {
-            holder.chipStatus.setText(R.string.filter_rejected);
-            holder.chipStatus.setChipBackgroundColorResource(R.color.statusRejected);
-            holder.chipStatus.setTextColor(holder.itemView.getContext().getResources().getColor(R.color.white));
-            String reason = record.getRejectionReason();
-            if (reason != null && !reason.isEmpty()) {
-                holder.tvRejectionReason.setVisibility(View.VISIBLE);
-                holder.tvRejectionReason.setText(reason);
-            } else {
-                holder.tvRejectionReason.setVisibility(View.GONE);
-            }
+            holder.tvStatus.setText(R.string.filter_rejected);
+            holder.tvStatus.setTextColor(holder.itemView.getContext().getResources().getColor(R.color.statusRejected));
+            holder.viewStatusDot.setBackgroundResource(R.color.statusRejected);
         }
     }
 
@@ -80,16 +71,16 @@ public class AttendanceRecordAdapter extends RecyclerView.Adapter<AttendanceReco
 
     static class ViewHolder extends RecyclerView.ViewHolder {
         final TextView tvDate;
-        final TextView tvSession;
-        final TextView tvRejectionReason;
-        final Chip chipStatus;
+        final TextView tvSubject;
+        final TextView tvStatus;
+        final View viewStatusDot;
 
         ViewHolder(@NonNull View itemView) {
             super(itemView);
-            tvDate = itemView.findViewById(R.id.tvRecordDate);
-            tvSession = itemView.findViewById(R.id.tvRecordSession);
-            tvRejectionReason = itemView.findViewById(R.id.tvRejectionReason);
-            chipStatus = itemView.findViewById(R.id.chipStatus);
+            tvDate = itemView.findViewById(R.id.tvDate);
+            tvSubject = itemView.findViewById(R.id.tvSubject);
+            tvStatus = itemView.findViewById(R.id.tvStatus);
+            viewStatusDot = itemView.findViewById(R.id.viewStatusDot);
         }
     }
 }

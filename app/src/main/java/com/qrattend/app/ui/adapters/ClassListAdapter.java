@@ -74,9 +74,9 @@ public class ClassListAdapter extends RecyclerView.Adapter<ClassListAdapter.View
 
         ViewHolder(@NonNull View itemView) {
             super(itemView);
-            tvSubject = itemView.findViewById(R.id.tvSubjectName);
+            tvSubject = itemView.findViewById(R.id.tvSubject);
             tvClassName = itemView.findViewById(R.id.tvClassName);
-            tvClassInfo = itemView.findViewById(R.id.tvClassInfo);
+            tvClassInfo = itemView.findViewById(R.id.tvStudentCount);
         }
     }
 }

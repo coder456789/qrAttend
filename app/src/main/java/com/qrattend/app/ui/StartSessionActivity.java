@@ -7,12 +7,15 @@ import android.location.Location;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.ArrayAdapter;
+import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.ActivityCompat;
@@ -40,7 +43,7 @@ public class StartSessionActivity extends AppCompatActivity {
 
     private Spinner spinnerClass;
     private TextView tvLocationLabel, tvLocationCoords;
-    private MaterialButton btnGetLocation, btnStartSession;
+    private MaterialButton btnGetLocation, btnStartSession, btnAddClass;
     private ProgressBar progressLocation, progressStartSession;
 
     private AuthManager authManager;
@@ -67,6 +70,7 @@ public class StartSessionActivity extends AppCompatActivity {
         btnStartSession = findViewById(R.id.btnStartSession);
         progressLocation = findViewById(R.id.progressLocation);
         progressStartSession = findViewById(R.id.progressStartSession);
+        btnAddClass = findViewById(R.id.btnAddClass);
 
         authManager = new AuthManager();
         classRepo = new ClassRepository();
@@ -74,6 +78,7 @@ public class StartSessionActivity extends AppCompatActivity {
 
         btnGetLocation.setOnClickListener(v -> fetchLocation());
         btnStartSession.setOnClickListener(v -> startSession());
+        btnAddClass.setOnClickListener(v -> showAddClassDialog());
 
         loadClasses();
     }
@@ -211,5 +216,55 @@ public class StartSessionActivity extends AppCompatActivity {
             btnStartSession.setEnabled(true);
             Toast.makeText(this, getString(R.string.error_start_session), Toast.LENGTH_LONG).show();
         }
+    }
+
+    private void showAddClassDialog() {
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        int padding = (int) (24 * getResources().getDisplayMetrics().density);
+        layout.setPadding(padding, padding / 2, padding, 0);
+
+        final EditText etClassName = new EditText(this);
+        etClassName.setHint(R.string.enter_class_name);
+        layout.addView(etClassName);
+
+        final EditText etSubject = new EditText(this);
+        etSubject.setHint(R.string.enter_subject);
+        layout.addView(etSubject);
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.add_class_title)
+                .setView(layout)
+                .setPositiveButton(R.string.save, (dialog, which) -> {
+                    String className = etClassName.getText().toString().trim();
+                    String subject = etSubject.getText().toString().trim();
+
+                    if (className.isEmpty()) {
+                        Toast.makeText(this, getString(R.string.error_class_name_empty), Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    if (subject.isEmpty()) {
+                        Toast.makeText(this, getString(R.string.error_subject_empty), Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    String uid = authManager.getCurrentUserId();
+                    if (uid == null) return;
+
+                    // Create class with current teacher auto-assigned
+                    ClassInfo newClass = new ClassInfo(className, subject, uid, new ArrayList<>());
+                    String docId = "class_" + className.replaceAll("\\s+", "_") + "_" + System.currentTimeMillis();
+
+                    classRepo.addClass(docId, newClass, task -> {
+                        if (task.isSuccessful()) {
+                            Toast.makeText(this, getString(R.string.class_created), Toast.LENGTH_SHORT).show();
+                            loadClasses(); // Refresh spinner
+                        } else {
+                            Toast.makeText(this, getString(R.string.error_create_class), Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
     }
 }

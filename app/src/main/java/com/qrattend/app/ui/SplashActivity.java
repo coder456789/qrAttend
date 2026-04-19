@@ -40,9 +40,7 @@ public class SplashActivity extends AppCompatActivity {
                     case Constants.ROLE_TEACHER:
                         navigateTo(TeacherDashboardActivity.class);
                         break;
-                    case Constants.ROLE_ADMIN:
-                        navigateTo(AdminDashboardActivity.class);
-                        break;
+
                     default:
                         navigateTo(LoginActivity.class);
                         break;

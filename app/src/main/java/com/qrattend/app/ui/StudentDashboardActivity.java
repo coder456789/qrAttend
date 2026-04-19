@@ -14,7 +14,7 @@ import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
 import com.qrattend.app.R;
 import com.qrattend.app.data.model.AttendanceRecord;
 import com.qrattend.app.data.repository.AttendanceRepository;
@@ -32,7 +32,7 @@ public class StudentDashboardActivity extends AppCompatActivity {
 
     private TextView tvAttendancePercent, tvEmptySubjects;
     private RecyclerView rvSubjects;
-    private FloatingActionButton fabScanQR;
+    private ExtendedFloatingActionButton fabScanQR;
     private AttendanceRecordAdapter adapter;
 
     private AuthManager authManager;

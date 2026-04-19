@@ -170,6 +170,38 @@
     <string name="logout">Logout</string>
     <string name="confirm_logout">Are you sure you want to logout?</string>
 
+    <!-- Forgot Password -->
+    <string name="forgot_password">Forgot Password?</string>
+    <string name="forgot_password_title">Reset Password</string>
+    <string name="forgot_password_message">Enter your email address and we\'ll send you a reset link.</string>
+    <string name="reset_email_sent">Password reset email sent! Check your inbox.</string>
+    <string name="error_reset_email">Failed to send reset email. Please check your email address.</string>
+    <string name="send_reset_link">Send Reset Link</string>
+
+    <!-- Change Password -->
+    <string name="change_password">Change Password</string>
+    <string name="change_password_title">Change Password</string>
+    <string name="current_password">Current Password</string>
+    <string name="new_password">New Password</string>
+    <string name="confirm_new_password">Confirm New Password</string>
+    <string name="password_changed">Password changed successfully!</string>
+    <string name="error_change_password">Failed to change password. Please check your current password.</string>
+    <string name="error_current_password_empty">Current password is required</string>
+    <string name="error_new_password_empty">New password is required</string>
+    <string name="error_new_password_short">New password must be at least 6 characters</string>
+    <string name="error_new_password_mismatch">New passwords do not match</string>
+
+    <!-- Add Class Dialog (Teacher + Admin) -->
+    <string name="new_class">New Class</string>
+    <string name="add_class_title">Add New Class</string>
+    <string name="enter_class_name">Enter class name (e.g. TY BSc CS)</string>
+    <string name="enter_subject">Enter subject (e.g. Data Structures)</string>
+    <string name="error_class_name_empty">Class name is required</string>
+    <string name="error_subject_empty">Subject is required</string>
+    <string name="class_created">Class created successfully!</string>
+    <string name="error_create_class">Failed to create class. Please try again.</string>
+    <string name="no_teachers_found">No teachers found</string>
+
     <!-- Common -->
     <string name="cancel">Cancel</string>
     <string name="save">Save</string>

@@ -233,17 +233,9 @@ public class AuthManager {
                                         cacheRole(context, uid, Constants.ROLE_TEACHER);
                                         callback.onSuccess(Constants.ROLE_TEACHER);
                                     } else {
-                                        // Check admins collection explicitly
-                                        db.collection("admins").document(uid).get().addOnSuccessListener(adminDoc -> {
-                                            if (adminDoc.exists()) {
-                                                cacheRole(context, uid, Constants.ROLE_ADMIN);
-                                                callback.onSuccess(Constants.ROLE_ADMIN);
-                                            } else {
-                                                //No role found? Sign them out!
-                                                logout(context);
-                                                callback.onSuccess("unauthorized");
-                                            }
-                                        });
+                                        //No role found? Sign them out!
+                                        logout(context);
+                                        callback.onSuccess("unauthorized");
                                     }
                                 })
                                 .addOnFailureListener(e -> {
@@ -273,6 +265,62 @@ public class AuthManager {
     public String getCachedRole(@NonNull Context context) {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .getString(Constants.PREF_USER_ROLE, null);
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    //  PASSWORD MANAGEMENT
+    // ════════════════════════════════════════════════════════════════════
+
+    /**
+     * Sends a password reset email to the specified address via Firebase Auth.
+     *
+     * @param email    the email address to send the reset link to
+     * @param callback completion listener
+     */
+    public void sendPasswordResetEmail(@NonNull String email,
+                                       @NonNull OnCompleteListener<Void> callback) {
+        auth.sendPasswordResetEmail(email)
+                .addOnCompleteListener(callback);
+    }
+
+    /**
+     * Changes the current user's password by re-authenticating first.
+     * <p>
+     * Firebase requires recent authentication for sensitive operations
+     * like password changes. This method re-authenticates using the
+     * current password, then updates to the new password.
+     * </p>
+     *
+     * @param currentPassword the user's current password for re-authentication
+     * @param newPassword     the desired new password
+     * @param callback        completion listener
+     */
+    public void changePassword(@NonNull String currentPassword,
+                               @NonNull String newPassword,
+                               @NonNull OnCompleteListener<Void> callback) {
+        FirebaseUser user = auth.getCurrentUser();
+        if (user == null || user.getEmail() == null) {
+            Log.w(TAG, "changePassword called but no user is signed in.");
+            return;
+        }
+
+        // Re-authenticate first
+        com.google.firebase.auth.AuthCredential credential =
+                com.google.firebase.auth.EmailAuthProvider.getCredential(
+                        user.getEmail(), currentPassword);
+
+        user.reauthenticate(credential)
+                .addOnSuccessListener(aVoid -> {
+                    // Now update the password
+                    user.updatePassword(newPassword)
+                            .addOnCompleteListener(callback);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Re-authentication failed", e);
+                    // Create a failed task to pass to callback
+                    com.google.android.gms.tasks.Tasks.<Void>forException(e)
+                            .addOnCompleteListener(callback);
+                });
     }
 
     // ════════════════════════════════════════════════════════════════════

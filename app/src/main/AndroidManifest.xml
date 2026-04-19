@@ -62,13 +62,7 @@
         <activity android:name=".ui.SessionAttendanceActivity"
             android:exported="false" />
 
-        <!-- Admin -->
-        <activity android:name=".ui.AdminDashboardActivity"
-            android:exported="false" />
-        <activity android:name=".ui.ManageUsersActivity"
-            android:exported="false" />
-        <activity android:name=".ui.ManageClassesActivity"
-            android:exported="false" />
+
 
         <!-- Shared -->
         <activity android:name=".ui.SettingsActivity"

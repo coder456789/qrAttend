@@ -2,6 +2,8 @@ package com.qrattend.app.ui;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
@@ -28,7 +30,7 @@ import java.util.Map;
 public class SettingsActivity extends AppCompatActivity {
 
     private TextInputEditText etName, etEmail, etPhone;
-    private MaterialButton btnSaveProfile, btnLogout;
+    private MaterialButton btnSaveProfile, btnLogout, btnChangePassword;
     private SwitchMaterial switchNotifications, switchDarkMode;
     private TextView tvVersion;
 
@@ -48,6 +50,7 @@ public class SettingsActivity extends AppCompatActivity {
         etPhone = findViewById(R.id.etSettingsPhone);
         btnSaveProfile = findViewById(R.id.btnSaveProfile);
         btnLogout = findViewById(R.id.btnLogout);
+        btnChangePassword = findViewById(R.id.btnChangePassword);
         switchNotifications = findViewById(R.id.switchNotifications);
         switchDarkMode = findViewById(R.id.switchDarkMode);
         tvVersion = findViewById(R.id.tvVersion);
@@ -60,6 +63,7 @@ public class SettingsActivity extends AppCompatActivity {
 
         btnSaveProfile.setOnClickListener(v -> saveProfile());
         btnLogout.setOnClickListener(v -> confirmLogout());
+        btnChangePassword.setOnClickListener(v -> showChangePasswordDialog());
     }
 
     private void loadProfile() {
@@ -132,6 +136,64 @@ public class SettingsActivity extends AppCompatActivity {
                     finish();
                 })
                 .setNegativeButton(R.string.no, null)
+                .show();
+    }
+
+    private void showChangePasswordDialog() {
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        int padding = (int) (24 * getResources().getDisplayMetrics().density);
+        layout.setPadding(padding, padding / 2, padding, 0);
+
+        final EditText etCurrentPass = new EditText(this);
+        etCurrentPass.setHint(R.string.current_password);
+        etCurrentPass.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        layout.addView(etCurrentPass);
+
+        final EditText etNewPass = new EditText(this);
+        etNewPass.setHint(R.string.new_password);
+        etNewPass.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        layout.addView(etNewPass);
+
+        final EditText etConfirmNewPass = new EditText(this);
+        etConfirmNewPass.setHint(R.string.confirm_new_password);
+        etConfirmNewPass.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        layout.addView(etConfirmNewPass);
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.change_password_title)
+                .setView(layout)
+                .setPositiveButton(R.string.save, (dialog, which) -> {
+                    String currentPass = etCurrentPass.getText().toString().trim();
+                    String newPass = etNewPass.getText().toString().trim();
+                    String confirmPass = etConfirmNewPass.getText().toString().trim();
+
+                    if (currentPass.isEmpty()) {
+                        Toast.makeText(this, getString(R.string.error_current_password_empty), Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    if (newPass.isEmpty()) {
+                        Toast.makeText(this, getString(R.string.error_new_password_empty), Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    if (newPass.length() < 6) {
+                        Toast.makeText(this, getString(R.string.error_new_password_short), Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    if (!newPass.equals(confirmPass)) {
+                        Toast.makeText(this, getString(R.string.error_new_password_mismatch), Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    authManager.changePassword(currentPass, newPass, task -> {
+                        if (task.isSuccessful()) {
+                            Toast.makeText(this, getString(R.string.password_changed), Toast.LENGTH_LONG).show();
+                        } else {
+                            Toast.makeText(this, getString(R.string.error_change_password), Toast.LENGTH_LONG).show();
+                        }
+                    });
+                })
+                .setNegativeButton(R.string.cancel, null)
                 .show();
     }
 }

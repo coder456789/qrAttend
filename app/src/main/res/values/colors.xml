@@ -1,49 +1,88 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Brand Colors -->
-    <color name="primary">#1565C0</color>
-    <color name="primaryDark">#0D47A1</color>
-    <color name="primaryLight">#42A5F5</color>
-    <color name="accent">#00BCD4</color>
+    <!-- ═══════════════════════════════════════════════════════════════
+         Sapphire Precision — Design System Colors
+         Generated via Stitch MCP, adapted for Android XML
+         ═══════════════════════════════════════════════════════════════ -->
+
+    <!-- Primary -->
+    <color name="primary">#005BBF</color>
+    <color name="primaryDark">#004493</color>
+    <color name="primaryLight">#1A73E8</color>
+    <color name="primaryContainer">#1A73E8</color>
+    <color name="onPrimary">#FFFFFF</color>
+    <color name="onPrimaryContainer">#FFFFFF</color>
+
+    <!-- Secondary -->
+    <color name="secondary">#2B5BB5</color>
+    <color name="secondaryContainer">#759EFD</color>
+    <color name="onSecondary">#FFFFFF</color>
+    <color name="onSecondaryContainer">#00337C</color>
+
+    <!-- Tertiary (Warning/Urgency) -->
+    <color name="tertiary">#9E4300</color>
+    <color name="tertiaryContainer">#C55500</color>
+
+    <!-- Accent (kept for legacy compat) -->
+    <color name="accent">#759EFD</color>
 
     <!-- Status Colors -->
-    <color name="success">#4CAF50</color>
-    <color name="error">#F44336</color>
-    <color name="warning">#FF9800</color>
+    <color name="success">#388E3C</color>
+    <color name="error">#BA1A1A</color>
+    <color name="errorContainer">#FFDAD6</color>
+    <color name="warning">#9E4300</color>
 
     <!-- Text Colors -->
-    <color name="textPrimary">#212121</color>
-    <color name="textSecondary">#757575</color>
+    <color name="textPrimary">#191C1D</color>
+    <color name="textSecondary">#414754</color>
     <color name="textOnPrimary">#FFFFFF</color>
+    <color name="textHint">#727785</color>
 
-    <!-- Surface Colors -->
-    <color name="background">#FAFAFA</color>
-    <color name="surface">#FFFFFF</color>
-    <color name="divider">#BDBDBD</color>
+    <!-- Surface / Background -->
+    <color name="background">#F8F9FA</color>
+    <color name="surface">#F8F9FA</color>
+    <color name="surfaceContainerLowest">#FFFFFF</color>
+    <color name="surfaceContainerLow">#F3F4F5</color>
+    <color name="surfaceContainer">#EDEEEF</color>
+    <color name="surfaceContainerHigh">#E7E8E9</color>
+    <color name="surfaceVariant">#E1E3E4</color>
+    <color name="outline">#727785</color>
+    <color name="outlineVariant">#C1C6D6</color>
+    <color name="divider">#C1C6D6</color>
 
     <!-- Attendance Status -->
-    <color name="statusPresent">#4CAF50</color>
-    <color name="statusRejected">#F44336</color>
+    <color name="statusPresent">#388E3C</color>
+    <color name="statusPresentBg">#E8F5E9</color>
+    <color name="statusRejected">#BA1A1A</color>
+    <color name="statusRejectedBg">#FFDAD6</color>
 
     <!-- Attendance Thresholds -->
     <color name="attendanceHigh">#388E3C</color>
-    <color name="attendanceMid">#F57C00</color>
-    <color name="attendanceLow">#D32F2F</color>
+    <color name="attendanceMid">#9E4300</color>
+    <color name="attendanceLow">#BA1A1A</color>
 
     <!-- Splash Gradient -->
-    <color name="splashStart">#0D47A1</color>
-    <color name="splashEnd">#1565C0</color>
+    <color name="splashStart">#005BBF</color>
+    <color name="splashEnd">#1A73E8</color>
 
     <!-- Misc -->
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="chipBackground">#E3F2FD</color>
-    <color name="cardStroke">#E0E0E0</color>
+    <color name="chipBackground">#D8E2FF</color>
+    <color name="chipText">#004493</color>
+    <color name="cardStroke">#C1C6D6</color>
     <color name="overlay">#80000000</color>
     <color name="scannerBackground">#000000</color>
-    <color name="qrDisplayBackground">#1A1A2E</color>
-    <color name="adminCardManageUsers">#E3F2FD</color>
-    <color name="adminCardManageClasses">#E8F5E9</color>
-    <color name="avatarBackground">#BBDEFB</color>
-    <color name="avatarText">#0D47A1</color>
+    <color name="qrDisplayBackground">#001A41</color>
+    <color name="avatarBackground">#D8E2FF</color>
+    <color name="avatarText">#004493</color>
+
+    <!-- Card Tints -->
+    <color name="cardScanQr">#D8E2FF</color>
+    <color name="cardHistory">#D9E2FF</color>
+    <color name="cardSettings">#F3F4F5</color>
+
+    <!-- Gradient overlay for headers -->
+    <color name="headerGradientStart">#005BBF</color>
+    <color name="headerGradientEnd">#1A73E8</color>
 </resources>

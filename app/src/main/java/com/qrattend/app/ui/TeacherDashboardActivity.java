@@ -12,7 +12,7 @@ import androidx.appcompat.widget.Toolbar;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
 import com.qrattend.app.R;
 import com.qrattend.app.data.model.ClassInfo;
 import com.qrattend.app.data.repository.ClassRepository;
@@ -25,7 +25,7 @@ public class TeacherDashboardActivity extends AppCompatActivity {
 
     private TextView tvTeacherName, tvTeacherSubject, tvEmptyClasses;
     private RecyclerView rvClasses;
-    private FloatingActionButton fabStartSession;
+    private ExtendedFloatingActionButton fabStartSession;
     private ClassListAdapter adapter;
 
     private AuthManager authManager;

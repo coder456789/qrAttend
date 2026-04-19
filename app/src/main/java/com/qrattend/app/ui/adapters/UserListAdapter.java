@@ -8,7 +8,6 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.android.material.chip.Chip;
 import com.qrattend.app.R;
 import com.qrattend.app.data.model.Student;
 import com.qrattend.app.data.model.Teacher;
@@ -60,18 +59,17 @@ public class UserListAdapter extends RecyclerView.Adapter<UserListAdapter.ViewHo
             holder.tvName.setText(name);
             holder.tvInfo.setText(s.getEmail() != null ? s.getEmail() : "");
             holder.tvAvatar.setText(name.isEmpty() ? "?" : String.valueOf(name.charAt(0)).toUpperCase());
-            holder.chipRole.setText(R.string.role_student);
-            holder.chipRole.setChipBackgroundColorResource(R.color.primary);
-            holder.chipRole.setTextColor(holder.itemView.getContext().getResources().getColor(R.color.white));
+            holder.tvRole.setText(R.string.role_student);
+            holder.tvRole.setBackgroundResource(R.drawable.bg_card_rounded); // Assuming this is used as a background
+            // Note: If you want to change background tint programmatically, you might need more logic
         } else if (currentType == UserType.TEACHER && user instanceof Teacher) {
             Teacher t = (Teacher) user;
             String name = t.getName() != null ? t.getName() : "";
             holder.tvName.setText(name);
             holder.tvInfo.setText(t.getEmail() != null ? t.getEmail() : "");
             holder.tvAvatar.setText(name.isEmpty() ? "?" : String.valueOf(name.charAt(0)).toUpperCase());
-            holder.chipRole.setText(R.string.role_teacher);
-            holder.chipRole.setChipBackgroundColorResource(R.color.accent);
-            holder.chipRole.setTextColor(holder.itemView.getContext().getResources().getColor(R.color.white));
+            holder.tvRole.setText(R.string.role_teacher);
+            holder.tvRole.setBackgroundResource(R.drawable.bg_card_rounded);
         }
 
         holder.itemView.setOnClickListener(v -> {
@@ -93,14 +91,14 @@ public class UserListAdapter extends RecyclerView.Adapter<UserListAdapter.ViewHo
         final TextView tvAvatar;
         final TextView tvName;
         final TextView tvInfo;
-        final Chip chipRole;
+        final TextView tvRole;
 
         ViewHolder(@NonNull View itemView) {
             super(itemView);
-            tvAvatar = itemView.findViewById(R.id.tvAvatar);
+            tvAvatar = itemView.findViewById(R.id.tvUserInitial);
             tvName = itemView.findViewById(R.id.tvUserName);
-            tvInfo = itemView.findViewById(R.id.tvUserInfo);
-            chipRole = itemView.findViewById(R.id.chipRole);
+            tvInfo = itemView.findViewById(R.id.tvUserEmail);
+            tvRole = itemView.findViewById(R.id.tvUserRole);
         }
     }
 }
