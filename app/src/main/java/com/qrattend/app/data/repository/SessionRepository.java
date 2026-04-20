@@ -83,9 +83,25 @@ public class SessionRepository {
                 .get()
                 .addOnSuccessListener(querySnapshot -> {
                     if (!querySnapshot.isEmpty()) {
-                        List<AttendanceSession> sessions = querySnapshot.toObjects(AttendanceSession.class);
+                        List<AttendanceSession> sessions = new java.util.ArrayList<>();
+                        for (AttendanceSession s : querySnapshot.toObjects(AttendanceSession.class)) {
+                            // Filter out manually created junk sessions from Firestore with invalid keys
+                            if (s.getSessionKey() != null && s.getSessionKey().length() >= 32) {
+                                sessions.add(s);
+                            }
+                        }
+                        
+                        if (sessions.isEmpty()) {
+                            callback.onSuccess(null);
+                            return;
+                        }
+
                         // Manually sort descending by startTime to avoid Firestore composite index requirement
-                        sessions.sort((s1, s2) -> s2.getStartTime().compareTo(s1.getStartTime()));
+                        sessions.sort((s1, s2) -> {
+                            if (s1.getStartTime() == null) return 1;
+                            if (s2.getStartTime() == null) return -1;
+                            return s2.getStartTime().compareTo(s1.getStartTime());
+                        });
                         callback.onSuccess(sessions.get(0));
                     } else {
                         callback.onSuccess(null);
