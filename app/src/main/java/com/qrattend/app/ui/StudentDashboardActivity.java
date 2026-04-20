@@ -63,6 +63,15 @@ public class StudentDashboardActivity extends AppCompatActivity {
         fabScanQR.setOnClickListener(v ->
                 startActivity(new Intent(this, ScanQRActivity.class)));
 
+        findViewById(R.id.cardScanQR).setOnClickListener(v ->
+                startActivity(new Intent(this, ScanQRActivity.class)));
+
+        findViewById(R.id.cardHistory).setOnClickListener(v ->
+                startActivity(new Intent(this, AttendanceHistoryActivity.class)));
+
+        toolbar.setNavigationOnClickListener(v ->
+                startActivity(new Intent(this, SettingsActivity.class)));
+
         loadData();
     }
 

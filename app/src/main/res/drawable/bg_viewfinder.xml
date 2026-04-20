@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Semi-transparent overlay -->
-    <item>
-        <shape android:shape="rectangle">
-            <solid android:color="#80000000" />
-        </shape>
-    </item>
-    <!-- Transparent center cutout area -->
-    <item
-        android:left="48dp"
-        android:top="120dp"
-        android:right="48dp"
-        android:bottom="240dp">
-        <shape android:shape="rectangle">
-            <stroke android:width="3dp" android:color="@color/primaryLight" />
-            <corners android:radius="12dp" />
-            <solid android:color="@android:color/transparent" />
-        </shape>
-    </item>
-</layer-list>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="400dp"
+    android:height="600dp"
+    android:viewportWidth="400"
+    android:viewportHeight="600">
+
+    <!-- Dark background overlay -->
+    <path
+        android:fillColor="#80000000"
+        android:pathData="M0,0h400v600h-400z M48,120v240h304v-240h-304z"
+        android:fillType="evenOdd" />
+
+    <!-- Corner borders for the scanner -->
+    <path
+        android:strokeColor="@color/primary"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M48,150v-30h30 M322,120h30v30 M352,330v30h-30 M78,360h-30v-30" />
+
+</vector>

@@ -95,6 +95,14 @@
     <string name="error_get_location">Please get your location first</string>
     <string name="error_start_session">Failed to start session. Please try again.</string>
     <string name="starting_session">Starting session…</string>
+    <string name="session_duration">Session Duration</string>
+    <string name="duration_1_min">1 Minute</string>
+    <string name="duration_2_min">2 Minutes</string>
+    <string name="duration_3_min">3 Minutes</string>
+    <string name="duration_4_min">4 Minutes</string>
+    <string name="duration_5_min">5 Minutes</string>
+    <string name="error_select_duration">Please select a session duration</string>
+    <string name="email_readonly">Email cannot be changed</string>
 
     <!-- Display QR -->
     <string name="display_qr_title">Attendance QR Code</string>
@@ -105,6 +113,8 @@
     <string name="confirm_end_session_message">This will stop accepting attendance. Are you sure?</string>
     <string name="session_ended">Session ended successfully</string>
     <string name="error_qr_generation">QR code generation failed</string>
+    <string name="session_time_remaining">Session ends in %1$d:%2$02d</string>
+    <string name="session_auto_ended">Session auto-ended (time expired)</string>
 
     <!-- Session Attendance -->
     <string name="session_attendance_title">Session Attendance</string>

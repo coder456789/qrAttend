@@ -41,10 +41,12 @@ public class StartSessionActivity extends AppCompatActivity {
 
     private static final int LOCATION_PERMISSION_CODE = 200;
 
-    private Spinner spinnerClass;
+    private Spinner spinnerClass, spinnerDuration;
     private TextView tvLocationLabel, tvLocationCoords;
     private MaterialButton btnGetLocation, btnStartSession, btnAddClass;
     private ProgressBar progressLocation, progressStartSession;
+
+    private static final int[] DURATION_MINUTES = {1, 2, 3, 4, 5};
 
     private AuthManager authManager;
     private ClassRepository classRepo;
@@ -71,16 +73,34 @@ public class StartSessionActivity extends AppCompatActivity {
         progressLocation = findViewById(R.id.progressLocation);
         progressStartSession = findViewById(R.id.progressStartSession);
         btnAddClass = findViewById(R.id.btnAddClass);
+        spinnerDuration = findViewById(R.id.spinnerDuration);
 
         authManager = new AuthManager();
         classRepo = new ClassRepository();
         sessionRepo = new SessionRepository();
+
+        setupDurationSpinner();
 
         btnGetLocation.setOnClickListener(v -> fetchLocation());
         btnStartSession.setOnClickListener(v -> startSession());
         btnAddClass.setOnClickListener(v -> showAddClassDialog());
 
         loadClasses();
+    }
+
+    private void setupDurationSpinner() {
+        String[] labels = {
+                getString(R.string.duration_1_min),
+                getString(R.string.duration_2_min),
+                getString(R.string.duration_3_min),
+                getString(R.string.duration_4_min),
+                getString(R.string.duration_5_min)
+        };
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item, labels);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerDuration.setAdapter(adapter);
+        spinnerDuration.setSelection(1); // Default to 2 minutes
     }
 
     private void loadClasses() {
@@ -197,6 +217,7 @@ public class StartSessionActivity extends AppCompatActivity {
                 btnStartSession.setEnabled(true);
 
                 if (task.isSuccessful()) {
+                    int durationMinutes = DURATION_MINUTES[spinnerDuration.getSelectedItemPosition()];
                     Intent intent = new Intent(this, DisplayQRActivity.class);
                     intent.putExtra("session_id", sessionId);
                     intent.putExtra("session_key", sessionKey);
@@ -204,6 +225,7 @@ public class StartSessionActivity extends AppCompatActivity {
                     intent.putExtra("course_id", selectedClass.getClassName());
                     intent.putExtra("latitude", latitude);
                     intent.putExtra("longitude", longitude);
+                    intent.putExtra("duration_minutes", durationMinutes);
                     startActivity(intent);
                     finish();
                 } else {

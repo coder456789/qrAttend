@@ -78,6 +78,9 @@ public class TeacherDashboardActivity extends AppCompatActivity {
         fabStartSession.setOnClickListener(v ->
                 startActivity(new Intent(this, StartSessionActivity.class)));
 
+        findViewById(R.id.cardStartSession).setOnClickListener(v ->
+                startActivity(new Intent(this, StartSessionActivity.class)));
+
         loadData();
     }
 

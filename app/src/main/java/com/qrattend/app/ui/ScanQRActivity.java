@@ -205,37 +205,43 @@ public class ScanQRActivity extends AppCompatActivity {
     }
 
     private void findActiveSessionAndScan(Student student, String uid) {
-        // Try to find an active session for the student
-        // We'll use ClassRepository to find enrolled classes, then check for active sessions
-        com.qrattend.app.data.repository.ClassRepository classRepo =
-                new com.qrattend.app.data.repository.ClassRepository();
+        // Query Firestore directly for any active session.
+        // We don't filter by enrollment because students may not be enrolled yet —
+        // the QR code encryption + geofence + device fingerprint already authenticate.
+        com.google.firebase.firestore.FirebaseFirestore db =
+                com.google.firebase.firestore.FirebaseFirestore.getInstance();
 
-        classRepo.getAllClasses(classes -> {
-            if (classes == null || classes.isEmpty()) {
-                progressScan.setVisibility(View.GONE);
-                tvScanStatus.setText(R.string.error_session_not_found);
-                return;
-            }
+        db.collection(Constants.SESSIONS)
+                .whereEqualTo("active", true)
+                .limit(5)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    if (querySnapshot == null || querySnapshot.isEmpty()) {
+                        progressScan.setVisibility(View.GONE);
+                        tvScanStatus.setText(R.string.error_session_not_found);
+                        btnTryAgain.setVisibility(View.VISIBLE);
+                        return;
+                    }
 
-            // Check each class for active sessions
-            for (com.qrattend.app.data.model.ClassInfo ci : classes) {
-                if (ci.getEnrolledStudents() != null && ci.getEnrolledStudents().contains(uid)) {
-                    sessionRepo.getActiveSession(ci.getClassName(), session -> {
+                    // Use the first active session that has a valid sessionKey
+                    for (com.google.firebase.firestore.DocumentSnapshot doc : querySnapshot.getDocuments()) {
+                        AttendanceSession session = doc.toObject(AttendanceSession.class);
                         if (session != null && session.isActive() && session.getSessionKey() != null) {
                             initializeScanner(session, student, uid);
                             return;
                         }
-                    });
-                }
-            }
+                    }
 
-            // If no session found after checking, show error
-            // (The callbacks are async, so this might fire before sessions are found.
-            //  In production, you'd use a counter or CompletableFuture.)
-            progressScan.setVisibility(View.GONE);
-            tvScanStatus.setText(R.string.error_session_not_found);
-            btnTryAgain.setVisibility(View.VISIBLE);
-        });
+                    // No valid session found
+                    progressScan.setVisibility(View.GONE);
+                    tvScanStatus.setText(R.string.error_session_not_found);
+                    btnTryAgain.setVisibility(View.VISIBLE);
+                })
+                .addOnFailureListener(e -> {
+                    progressScan.setVisibility(View.GONE);
+                    tvScanStatus.setText(R.string.error_session_not_found);
+                    btnTryAgain.setVisibility(View.VISIBLE);
+                });
     }
 
     private AttendanceSession currentSession;
@@ -263,7 +269,7 @@ public class ScanQRActivity extends AppCompatActivity {
             @Override
             public void onError(String reason) {
                 runOnUiThread(() -> {
-                    tvScanStatus.setText(getString(R.string.error_scan_failed));
+                    tvScanStatus.setText(getString(R.string.error_scan_failed) + "\nReason: " + reason);
                     btnTryAgain.setVisibility(View.VISIBLE);
                 });
             }
@@ -305,54 +311,67 @@ public class ScanQRActivity extends AppCompatActivity {
     }
 
     private void validateAndMark(QRGeneratorUtil.QRPayload payload, Location location) {
-        // ProxyDetectionEngine.validate(payload, location, session, student, callback)
-        proxyEngine.validate(payload, location, currentSession, currentStudent, result -> {
-            runOnUiThread(() -> {
-                progressScan.setVisibility(View.GONE);
+        String deviceFp = proxyEngine.getCurrentDeviceFingerprint();
 
-                String deviceFp = proxyEngine.getCurrentDeviceFingerprint();
-                GeoPoint geoPoint = new GeoPoint(location.getLatitude(), location.getLongitude());
+        // STEP 1: Register device BEFORE validation so first-time students aren't blocked.
+        // registerDevice is idempotent — safe to call on every scan.
+        new StudentRepository().registerDevice(currentUid, deviceFp, regTask -> {
 
-                if (result.success) {
-                    // Build AttendanceRecord with actual constructor:
-                    // (status, Timestamp, deviceId, GeoPoint, rejectionReason, studentId, sessionId)
-                    AttendanceRecord record = new AttendanceRecord(
-                            Constants.STATUS_PRESENT,
-                            Timestamp.now(),
-                            deviceFp,
-                            geoPoint,
-                            Constants.REASON_NONE,
-                            currentUid,
-                            payload.sessionId
-                    );
-
-                    attendanceRepo.markAttendance(payload.sessionId, currentUid, record, task -> {
-                        if (task.isSuccessful()) {
-                            // Also register device on first scan
-                            new StudentRepository().registerDevice(currentUid, deviceFp, t -> {});
-
-                            showSuccessDialog();
-                        } else {
-                            tvScanStatus.setText(R.string.error_generic);
-                            btnTryAgain.setVisibility(View.VISIBLE);
-                        }
+            // STEP 2: Re-fetch the session FRESH from Firestore so the nonce is always
+            // the latest one (QRRefreshManager rotates it every 10 seconds).
+            sessionRepo.getSession(payload.sessionId, freshSession -> {
+                if (freshSession == null || !freshSession.isActive()) {
+                    runOnUiThread(() -> {
+                        progressScan.setVisibility(View.GONE);
+                        tvScanStatus.setText(R.string.error_session_not_found);
+                        btnTryAgain.setVisibility(View.VISIBLE);
                     });
-                } else {
-                    // Rejected — record the rejected attendance too
-                    AttendanceRecord record = new AttendanceRecord(
-                            Constants.STATUS_REJECTED,
-                            Timestamp.now(),
-                            deviceFp,
-                            geoPoint,
-                            result.rejectionReason,
-                            currentUid,
-                            payload.sessionId
-                    );
-
-                    attendanceRepo.markAttendance(payload.sessionId, currentUid, record, task -> {});
-
-                    showRejectionDialog(result.rejectionReason);
+                    return;
                 }
+
+                // STEP 3: Also re-fetch student so deviceId is definitely populated.
+                studentRepo.getStudent(currentUid, freshStudent -> {
+
+                    // STEP 4: Validate with fresh data.
+                    proxyEngine.validate(payload, location, freshSession, freshStudent, result -> {
+                        runOnUiThread(() -> {
+                            progressScan.setVisibility(View.GONE);
+                            GeoPoint geoPoint = new GeoPoint(location.getLatitude(), location.getLongitude());
+
+                            if (result.success) {
+                                AttendanceRecord record = new AttendanceRecord(
+                                        Constants.STATUS_PRESENT,
+                                        Timestamp.now(),
+                                        deviceFp,
+                                        geoPoint,
+                                        Constants.REASON_NONE,
+                                        currentUid,
+                                        payload.sessionId
+                                );
+                                attendanceRepo.markAttendance(payload.sessionId, currentUid, record, task -> {
+                                    if (task.isSuccessful()) {
+                                        showSuccessDialog();
+                                    } else {
+                                        tvScanStatus.setText(R.string.error_generic);
+                                        btnTryAgain.setVisibility(View.VISIBLE);
+                                    }
+                                });
+                            } else {
+                                AttendanceRecord record = new AttendanceRecord(
+                                        Constants.STATUS_REJECTED,
+                                        Timestamp.now(),
+                                        deviceFp,
+                                        geoPoint,
+                                        result.rejectionReason,
+                                        currentUid,
+                                        payload.sessionId
+                                );
+                                attendanceRepo.markAttendance(payload.sessionId, currentUid, record, task -> {});
+                                showRejectionDialog(result.rejectionReason);
+                            }
+                        });
+                    });
+                });
             });
         });
     }

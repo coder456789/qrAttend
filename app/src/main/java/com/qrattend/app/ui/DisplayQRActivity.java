@@ -22,13 +22,14 @@ import com.qrattend.app.utils.Constants;
 public class DisplayQRActivity extends AppCompatActivity {
 
     private ImageView ivQRCode;
-    private TextView tvCountdown, tvLiveCount;
+    private TextView tvCountdown, tvLiveCount, tvSessionTimer;
     private MaterialButton btnEndSession;
 
     private QRRefreshManager refreshManager;
     private SessionRepository sessionRepo;
     private ListenerRegistration countListener;
     private CountDownTimer countDownTimer;
+    private CountDownTimer sessionTimer;
 
     private String sessionId;
     private String sessionKey;
@@ -44,6 +45,7 @@ public class DisplayQRActivity extends AppCompatActivity {
         ivQRCode = findViewById(R.id.ivQRCode);
         tvCountdown = findViewById(R.id.tvCountdown);
         tvLiveCount = findViewById(R.id.tvLiveCount);
+        tvSessionTimer = findViewById(R.id.tvSessionTimer);
         btnEndSession = findViewById(R.id.btnEndSession);
 
         sessionRepo = new SessionRepository();
@@ -109,6 +111,10 @@ public class DisplayQRActivity extends AppCompatActivity {
                 });
 
         btnEndSession.setOnClickListener(v -> confirmEndSession());
+
+        // Start session-level auto-end timer
+        int durationMinutes = getIntent().getIntExtra("duration_minutes", 2);
+        startSessionTimer(durationMinutes);
     }
 
     private void resetCountdown() {
@@ -128,6 +134,25 @@ public class DisplayQRActivity extends AppCompatActivity {
             }
         };
         countDownTimer.start();
+    }
+
+    private void startSessionTimer(int durationMinutes) {
+        long durationMs = durationMinutes * 60 * 1000L;
+        sessionTimer = new CountDownTimer(durationMs, 1000) {
+            @Override
+            public void onTick(long millisUntilFinished) {
+                int minutes = (int) (millisUntilFinished / 60000);
+                int seconds = (int) ((millisUntilFinished % 60000) / 1000);
+                tvSessionTimer.setText(getString(R.string.session_time_remaining, minutes, seconds));
+            }
+
+            @Override
+            public void onFinish() {
+                tvSessionTimer.setText(getString(R.string.session_auto_ended));
+                endSession();
+            }
+        };
+        sessionTimer.start();
     }
 
     private void confirmEndSession() {
@@ -156,5 +181,6 @@ public class DisplayQRActivity extends AppCompatActivity {
         if (refreshManager != null) refreshManager.stop();
         if (countListener != null) countListener.remove();
         if (countDownTimer != null) countDownTimer.cancel();
+        if (sessionTimer != null) sessionTimer.cancel();
     }
 }

@@ -17,6 +17,7 @@ import com.qrattend.app.data.model.AttendanceSession;
 import com.qrattend.app.utils.Constants;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -79,12 +80,13 @@ public class SessionRepository {
         sessionsRef
                 .whereEqualTo("classId", classId)
                 .whereEqualTo("active", true)
-                .limit(1)
                 .get()
                 .addOnSuccessListener(querySnapshot -> {
                     if (!querySnapshot.isEmpty()) {
-                        callback.onSuccess(querySnapshot.getDocuments().get(0)
-                                .toObject(AttendanceSession.class));
+                        List<AttendanceSession> sessions = querySnapshot.toObjects(AttendanceSession.class);
+                        // Manually sort descending by startTime to avoid Firestore composite index requirement
+                        sessions.sort((s1, s2) -> s2.getStartTime().compareTo(s1.getStartTime()));
+                        callback.onSuccess(sessions.get(0));
                     } else {
                         callback.onSuccess(null);
                     }
@@ -94,8 +96,10 @@ public class SessionRepository {
     // ── Nonce / QR Update ───────────────────────────────────────────────
 
     /**
-     * Updates both the QR nonce and the secret session key simultaneously.
-     * This ensures the "handshake" between student and teacher is always fresh.
+     * Updates only the QR nonce in Firestore each refresh cycle.
+     * The sessionKey is intentionally NOT rotated — it must remain stable
+     * so that the student's scanner (initialized once at session discovery)
+     * can always decrypt QR codes for the full session lifetime.
      */
     public void updateSecureNonce(@NonNull String sessionId,
                                   @NonNull String newNonce,
@@ -103,7 +107,8 @@ public class SessionRepository {
                                   @NonNull OnCompleteListener<Void> callback) {
         Map<String, Object> updates = new HashMap<>();
         updates.put("qrCode", newNonce);
-        updates.put("sessionKey", newSessionKey);
+        // sessionKey deliberately excluded — rotating it would break
+        // any scanner that was initialized before the rotation.
 
         sessionsRef.document(sessionId)
                 .update(updates)

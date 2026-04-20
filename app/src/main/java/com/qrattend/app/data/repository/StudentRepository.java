@@ -93,20 +93,30 @@ public class StudentRepository {
                                @NonNull String newDeviceId,
                                @NonNull OnCompleteListener<Void> callback) {
         getStudent(studentId, student -> {
-            if (student == null) return;
+            if (student == null) {
+                // Student doc doesn't exist yet — write deviceId directly
+                Map<String, Object> updates = new HashMap<>();
+                updates.put("deviceId", newDeviceId);
+                updateStudent(studentId, updates, callback);
+                return;
+            }
 
             Map<String, Object> updates = new HashMap<>();
-            // If primary is empty or same, set primary
-            if (student.getDeviceId() == null || student.getDeviceId().isEmpty() || student.getDeviceId().equals(newDeviceId)) {
+            if (student.getDeviceId() == null || student.getDeviceId().isEmpty()
+                    || student.getDeviceId().equals(newDeviceId)) {
                 updates.put("deviceId", newDeviceId);
-            } 
-            // Otherwise, if secondary is empty or same, set secondary
-            else if (student.getDeviceId2() == null || student.getDeviceId2().isEmpty() || student.getDeviceId2().equals(newDeviceId)) {
+            } else if (student.getDeviceId2() == null || student.getDeviceId2().isEmpty()
+                    || student.getDeviceId2().equals(newDeviceId)) {
                 updates.put("deviceId2", newDeviceId);
             }
-            
+            // If both slots are already filled with different devices, still fire callback
+            // so the scan flow continues to the validation/rejection step.
+
             if (!updates.isEmpty()) {
                 updateStudent(studentId, updates, callback);
+            } else {
+                // No update needed — fire callback immediately so flow continues
+                callback.onComplete(com.google.android.gms.tasks.Tasks.forResult(null));
             }
         });
     }
