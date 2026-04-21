@@ -1,0 +1,270 @@
+rules_version = '2';
+
+// ═══════════════════════════════════════════════════════════════════════
+// QR-Attend — Production Firestore Security Rules
+// ═══════════════════════════════════════════════════════════════════════
+//
+// Database Schema:
+//   students/{uid}                              → Student profiles
+//   teachers/{uid}                              → Teacher profiles
+//   classes/{classId}                           → Class/batch documents
+//   attendanceSessions/{sessionId}              → Attendance sessions
+//   attendanceSessions/{sessionId}/records/{studentId} → Attendance records
+//
+// Role Detection:
+//   - Student  → document exists in /students/{uid}
+//   - Teacher  → document exists in /teachers/{uid}
+//   - Admin    → UID not found in students OR teachers (create accounts
+//                via Firebase Console; admin docs are not in Firestore)
+//
+// ═══════════════════════════════════════════════════════════════════════
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helper Functions ──────────────────────────────────────────────
+
+    // Returns true if the request comes from an authenticated user
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Returns the UID of the currently authenticated user
+    function uid() {
+      return request.auth.uid;
+    }
+
+    // Returns true if the authenticated user has a document in /students
+    function isStudent() {
+      return isAuthenticated()
+          && exists(/databases/$(database)/documents/students/$(uid()));
+    }
+
+    // Returns true if the authenticated user has a document in /teachers
+    function isTeacher() {
+      return isAuthenticated()
+          && exists(/databases/$(database)/documents/teachers/$(uid()));
+    }
+
+    // Returns true if the user is an admin (exists in neither collection)
+    // Admins are created via the Firebase Console and have no Firestore profile
+    function isAdmin() {
+      return isAuthenticated()
+          && !exists(/databases/$(database)/documents/students/$(uid()))
+          && !exists(/databases/$(database)/documents/teachers/$(uid()));
+    }
+
+    // Returns true if the user is either a teacher or admin
+    function isTeacherOrAdmin() {
+      return isTeacher() || isAdmin();
+    }
+
+    // ─── Validation Helpers ────────────────────────────────────────────
+
+    // Validates that a string field exists and is non-empty
+    function isNonEmptyString(field) {
+      return field is string && field.size() > 0;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  /students/{studentId}
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    //  CREATE  → Admin only (student accounts are provisioned by admin)
+    //  READ    → Own document, OR any teacher/admin
+    //  UPDATE  → Own document (limited fields), OR admin (any field)
+    //  DELETE  → Admin only
+    //
+    match /students/{studentId} {
+
+      allow create: if isAdmin()
+                    && isNonEmptyString(request.resource.data.name)
+                    && isNonEmptyString(request.resource.data.email)
+                    && isNonEmptyString(request.resource.data.rollNo);
+
+      allow read:   if isAuthenticated()
+                    && (uid() == studentId || isTeacherOrAdmin());
+
+      allow update: if isAuthenticated()
+                    && (
+                      // Students can only update their own deviceId, deviceId2, fcmToken
+                      (uid() == studentId
+                        && request.resource.data.diff(resource.data).affectedKeys()
+                            .hasOnly(['deviceId', 'deviceId2', 'fcmToken']))
+                      // Admins can update anything
+                      || isAdmin()
+                    );
+
+      allow delete: if isAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  /teachers/{teacherId}
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    //  CREATE  → Admin only (teacher accounts are provisioned by admin)
+    //  READ    → Own document, OR any other teacher, OR admin
+    //  UPDATE  → Own document (limited fields), OR admin (any field)
+    //  DELETE  → Admin only
+    //
+    match /teachers/{teacherId} {
+
+      allow create: if isAdmin()
+                    && isNonEmptyString(request.resource.data.name)
+                    && isNonEmptyString(request.resource.data.email);
+
+      allow read:   if isAuthenticated()
+                    && (uid() == teacherId || isTeacherOrAdmin() || isStudent());
+
+      allow update: if isAuthenticated()
+                    && (
+                      // Teachers can only update their own fcmToken
+                      (uid() == teacherId
+                        && request.resource.data.diff(resource.data).affectedKeys()
+                            .hasOnly(['fcmToken']))
+                      // Admins can update anything
+                      || isAdmin()
+                    );
+
+      allow delete: if isAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  /classes/{classId}
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    //  CREATE  → Teacher (assigning themselves) or Admin
+    //  READ    → Any authenticated user (students need to see their class)
+    //  UPDATE  → Assigned teacher or Admin
+    //  DELETE  → Admin only
+    //
+    match /classes/{classId} {
+
+      allow create: if isAuthenticated()
+                    && (
+                      // Teachers can create classes assigned to themselves
+                      (isTeacher() && request.resource.data.teacherId == uid())
+                      || isAdmin()
+                    )
+                    && isNonEmptyString(request.resource.data.className);
+
+      allow read:   if isAuthenticated();
+
+      allow update: if isAuthenticated()
+                    && (
+                      // Only the assigned teacher can update their own class
+                      (isTeacher() && resource.data.teacherId == uid())
+                      || isAdmin()
+                    )
+                    // Prevent teachers from reassigning to another teacher
+                    && (request.resource.data.teacherId == resource.data.teacherId
+                        || isAdmin());
+
+      allow delete: if isAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  /attendanceSessions/{sessionId}
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    //  CREATE  → Teacher (creating session for their class) or Admin
+    //  READ    → Any authenticated user (students need to scan QR)
+    //  UPDATE  → Session owner (teacher who created it) or Admin
+    //  DELETE  → Admin only
+    //
+    match /attendanceSessions/{sessionId} {
+
+      allow create: if isAuthenticated()
+                    && (
+                      (isTeacher() && request.resource.data.teacherId == uid())
+                      || isAdmin()
+                    )
+                    && isNonEmptyString(request.resource.data.classId)
+                    && request.resource.data.active == true;
+
+      allow read:   if isAuthenticated();
+
+      allow update: if isAuthenticated()
+                    && (
+                      // Only the session owner can update (nonce rotation, end session)
+                      (isTeacher() && resource.data.teacherId == uid())
+                      || isAdmin()
+                    )
+                    // Cannot change the teacherId or classId after creation
+                    && request.resource.data.teacherId == resource.data.teacherId
+                    && request.resource.data.classId == resource.data.classId;
+
+      allow delete: if isAdmin();
+
+      // ─────────────────────────────────────────────────────────────────
+      //  /attendanceSessions/{sessionId}/records/{studentId}
+      // ─────────────────────────────────────────────────────────────────
+      //
+      //  CREATE  → Student marking own attendance (one record per student)
+      //  READ    → Session owner teacher, the student themselves, or Admin
+      //  UPDATE  → Session owner teacher (manual override) or Admin
+      //  DELETE  → Admin only
+      //
+      match /records/{studentId} {
+
+        allow create: if isAuthenticated()
+                      && isStudent()
+                      && uid() == studentId
+                      // Session must still be active
+                      && get(/databases/$(database)/documents/attendanceSessions/$(sessionId)).data.active == true
+                      // Record must reference correct IDs
+                      && request.resource.data.studentId == uid()
+                      && request.resource.data.sessionId == sessionId;
+
+        allow read:   if isAuthenticated()
+                      && (
+                        // The student who owns this record
+                        uid() == studentId
+                        // The teacher who owns the session
+                        || (isTeacher()
+                            && get(/databases/$(database)/documents/attendanceSessions/$(sessionId)).data.teacherId == uid())
+                        || isAdmin()
+                      );
+
+        allow update: if isAuthenticated()
+                      && (
+                        // Teacher who owns the session (manual mark present)
+                        (isTeacher()
+                          && get(/databases/$(database)/documents/attendanceSessions/$(sessionId)).data.teacherId == uid())
+                        || isAdmin()
+                      );
+
+        allow delete: if isAdmin();
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  COLLECTION GROUP QUERY: records
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    //  Used by: AttendanceRepository.getStudentHistory()
+    //  collectionGroup query with whereEqualTo("studentId", uid)
+    //
+    //  Allows a student to read their own records across all sessions.
+    //
+    match /{path=**}/records/{studentId} {
+      allow read: if isAuthenticated()
+                  && (
+                    // Student can read their own records via collectionGroup
+                    (isStudent() && request.auth.uid == resource.data.studentId)
+                    || isTeacherOrAdmin()
+                  );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  DEFAULT: Deny everything else
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    //  Any path not matched above is implicitly denied by Firestore.
+    //  This explicit catch-all makes the intent clear.
+    //
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

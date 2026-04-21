@@ -2,6 +2,7 @@ package com.qrattend.app.qr;
 
 import android.content.Context;
 import android.media.Image;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.camera.core.CameraSelector;
@@ -163,16 +164,26 @@ public class QRScannerUtil {
         String json;
         try {
             json = AESCryptoUtil.decrypt(encryptedPayload, sessionKey);
+            Log.d("QRScan", "Decryption SUCCESS. JSON length=" + json.length());
         } catch (Exception e) {
-            if (!scanHandled) { scanHandled = true; callback.onError("qr_decrypt_fail"); }
+            Log.e("QRScan", "Decryption FAILED. reason=" + e.getClass().getSimpleName()
+                    + " msg=" + e.getMessage()
+                    + " keyLen=" + (sessionKey != null ? sessionKey.length() : "null")
+                    + " payloadLen=" + encryptedPayload.length());
+            if (!scanHandled) { 
+                scanHandled = true; 
+                callback.onError("qr_decrypt_fail: " + e.getMessage() + " keyLen=" + (sessionKey != null ? sessionKey.length() : "null")); 
+            }
             return;
         }
 
         try {
             QRGeneratorUtil.QRPayload payload = QRGeneratorUtil.QRPayload.fromJson(json);
+            Log.d("QRScan", "Parse SUCCESS. sessionId=" + payload.sessionId);
             scanHandled = true;
             callback.onPayloadDecoded(payload);
         } catch (Exception e) {
+            Log.e("QRScan", "Parse FAILED. json=" + json + " err=" + e.getMessage());
             if (!scanHandled) { scanHandled = true; callback.onError("parse_fail"); }
         }
     }

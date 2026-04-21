@@ -1,6 +1,6 @@
 package com.qrattend.app.security;
 
-import java.util.Base64;
+import android.util.Base64;
 
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
@@ -49,14 +49,19 @@ public class AESCryptoUtil {
         KeyGenerator kg = KeyGenerator.getInstance("AES");
         kg.init(KEY_SIZE_BITS, new SecureRandom());
         SecretKey key = kg.generateKey();
-        return Base64.getEncoder().encodeToString(key.getEncoded());
+        return Base64.encodeToString(key.getEncoded(), Base64.NO_WRAP);
     }
 
     /**
      * Reconstructs a SecretKey from its Base64 string form.
      */
     public static SecretKey decodeKey(String base64Key) {
-        byte[] keyBytes = Base64.getDecoder().decode(base64Key);
+        byte[] keyBytes = Base64.decode(base64Key, Base64.NO_WRAP);
+        if (keyBytes.length != 16 && keyBytes.length != 32) {
+            throw new IllegalArgumentException(
+                    "Unsupported key size: " + keyBytes.length
+                            + " bytes (must be 16 or 32)");
+        }
         return new SecretKeySpec(keyBytes, "AES");
     }
 
@@ -87,7 +92,9 @@ public class AESCryptoUtil {
         System.arraycopy(iv, 0, combined, 0, iv.length);
         System.arraycopy(ciphertext, 0, combined, iv.length, ciphertext.length);
 
-        return Base64.getEncoder().encodeToString(combined);
+        // Use URL-safe Base64 WITHOUT padding:
+        // Standard Base64 uses +, /, = which QR scanners can misread.
+        return Base64.encodeToString(combined, Base64.URL_SAFE | Base64.NO_PADDING | Base64.NO_WRAP);
     }
 
     // -----------------------------------------------------------------------
@@ -103,7 +110,15 @@ public class AESCryptoUtil {
      * @throws Exception       If decryption fails (wrong key / tampered data)
      */
     public static String decrypt(String encryptedBase64, String base64Key) throws Exception {
-        byte[] combined = Base64.getDecoder().decode(encryptedBase64);
+        // Accept both URL-safe (new) and standard (legacy) Base64
+        byte[] combined;
+        try {
+            // First try URL-safe decoder, tolerant of missing padding
+            combined = Base64.decode(encryptedBase64, Base64.URL_SAFE | Base64.NO_WRAP);
+        } catch (IllegalArgumentException e) {
+            // Fallback to standard Base64 if needed
+            combined = Base64.decode(encryptedBase64, Base64.DEFAULT);
+        }
 
         byte[] iv         = new byte[GCM_IV_LENGTH];
         byte[] ciphertext = new byte[combined.length - GCM_IV_LENGTH];
