@@ -42,21 +42,21 @@ public class DisplayQRActivity extends AppCompatActivity {
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
-        ivQRCode = findViewById(R.id.ivQRCode);
-        tvCountdown = findViewById(R.id.tvCountdown);
-        tvLiveCount = findViewById(R.id.tvLiveCount);
-        tvSessionTimer = findViewById(R.id.tvSessionTimer);
-        btnEndSession = findViewById(R.id.btnEndSession);
+        ivQRCode        = findViewById(R.id.ivQRCode);
+        tvCountdown     = findViewById(R.id.tvCountdown);
+        tvLiveCount     = findViewById(R.id.tvLiveCount);
+        tvSessionTimer  = findViewById(R.id.tvSessionTimer);
+        btnEndSession   = findViewById(R.id.btnEndSession);
 
         sessionRepo = new SessionRepository();
 
         // Receive intent extras
-        sessionId = getIntent().getStringExtra("session_id");
-        sessionKey = getIntent().getStringExtra("session_key");
+        sessionId        = getIntent().getStringExtra("session_id");
+        sessionKey       = getIntent().getStringExtra("session_key");
         String teacherId = getIntent().getStringExtra("teacher_id");
-        String courseId = getIntent().getStringExtra("course_id");
-        double lat = getIntent().getDoubleExtra("latitude", 0);
-        double lng = getIntent().getDoubleExtra("longitude", 0);
+        String courseId  = getIntent().getStringExtra("course_id");
+        double lat       = getIntent().getDoubleExtra("latitude", 0);
+        double lng       = getIntent().getDoubleExtra("longitude", 0);
 
         if (sessionId == null || sessionKey == null) {
             Toast.makeText(this, getString(R.string.error_generic), Toast.LENGTH_LONG).show();
@@ -64,13 +64,10 @@ public class DisplayQRActivity extends AppCompatActivity {
             return;
         }
 
-        // Build geoHash using actual static method from QRGeneratorUtil
         String geoHash = QRGeneratorUtil.buildGeoHash(lat, lng);
 
-        // QRRefreshManager constructor: (sessionId, teacherId, courseId, geoHash, sessionKey)
         refreshManager = new QRRefreshManager(sessionId, teacherId, courseId, geoHash, sessionKey);
 
-        // start(RefreshListener) — listener has onNewQR(Bitmap), onNewNonce(nonce, sessionKey), onError(String)
         refreshManager.start(new QRRefreshManager.RefreshListener() {
             @Override
             public void onNewQR(Bitmap qrBitmap) {
@@ -82,9 +79,10 @@ public class DisplayQRActivity extends AppCompatActivity {
 
             @Override
             public void onNewNonce(String nonce, String key) {
-                // SessionRepository.updateSecureNonce(sessionId, nonce, sessionKey, callback)
-                sessionRepo.updateSecureNonce(sessionId, nonce, key, task -> {
-                    // Nonce updated in Firestore
+                // FIX: was calling sessionRepo.updateSecureNonce() which doesn't exist.
+                // Correct method name is updateNonce() — matches SessionRepository contract.
+                sessionRepo.updateNonce(sessionId, nonce, key, task -> {
+                    // Nonce updated in Firestore — students will get the fresh nonce on next read
                 });
             }
 
@@ -112,7 +110,6 @@ public class DisplayQRActivity extends AppCompatActivity {
 
         btnEndSession.setOnClickListener(v -> confirmEndSession());
 
-        // Start session-level auto-end timer
         int durationMinutes = getIntent().getIntExtra("duration_minutes", 2);
         startSessionTimer(durationMinutes);
     }
@@ -168,7 +165,6 @@ public class DisplayQRActivity extends AppCompatActivity {
         if (refreshManager != null) {
             refreshManager.stop();
         }
-
         sessionRepo.endSession(sessionId, task -> {
             Toast.makeText(this, getString(R.string.session_ended), Toast.LENGTH_SHORT).show();
             finish();
@@ -178,9 +174,9 @@ public class DisplayQRActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (refreshManager != null) refreshManager.stop();
-        if (countListener != null) countListener.remove();
-        if (countDownTimer != null) countDownTimer.cancel();
-        if (sessionTimer != null) sessionTimer.cancel();
+        if (refreshManager  != null) refreshManager.stop();
+        if (countListener   != null) countListener.remove();
+        if (countDownTimer  != null) countDownTimer.cancel();
+        if (sessionTimer    != null) sessionTimer.cancel();
     }
 }

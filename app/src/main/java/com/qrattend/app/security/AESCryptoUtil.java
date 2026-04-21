@@ -57,6 +57,11 @@ public class AESCryptoUtil {
      */
     public static SecretKey decodeKey(String base64Key) {
         byte[] keyBytes = Base64.decode(base64Key, Base64.NO_WRAP);
+        if (keyBytes.length != 16 && keyBytes.length != 32) {
+            throw new IllegalArgumentException(
+                    "Unsupported key size: " + keyBytes.length
+                            + " bytes (must be 16 or 32)");
+        }
         return new SecretKeySpec(keyBytes, "AES");
     }
 

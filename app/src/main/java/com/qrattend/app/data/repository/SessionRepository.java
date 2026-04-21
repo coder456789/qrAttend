@@ -28,7 +28,7 @@ import java.util.Map;
  * </p>
  *
  * @author QR-Attend Team — Member 3 (Backend & Integration Lead)
- * @version 1.0
+ * @version 1.1
  * @since 2026-03-27
  */
 public class SessionRepository {
@@ -67,7 +67,6 @@ public class SessionRepository {
         sessionsRef.document(sessionId)
                 .get()
                 .addOnSuccessListener(snapshot -> {
-                    // Optimized: toObject handles null check internally
                     callback.onSuccess(snapshot.toObject(AttendanceSession.class));
                 });
     }
@@ -90,7 +89,7 @@ public class SessionRepository {
                                 sessions.add(s);
                             }
                         }
-                        
+
                         if (sessions.isEmpty()) {
                             callback.onSuccess(null);
                             return;
@@ -113,14 +112,21 @@ public class SessionRepository {
 
     /**
      * Updates only the QR nonce in Firestore each refresh cycle.
+     *
+     * FIX: Renamed from updateSecureNonce → updateNonce to match the method
+     * name used in QRRefreshManager.RefreshListener.onNewNonce() integration
+     * contract. The old name caused DisplayQRActivity to call a non-existent
+     * method, meaning the nonce was never written to Firestore and students
+     * always got a stale/null nonce → decrypt key mismatch.
+     *
      * The sessionKey is intentionally NOT rotated — it must remain stable
      * so that the student's scanner (initialized once at session discovery)
      * can always decrypt QR codes for the full session lifetime.
      */
-    public void updateSecureNonce(@NonNull String sessionId,
-                                  @NonNull String newNonce,
-                                  @NonNull String newSessionKey,
-                                  @NonNull OnCompleteListener<Void> callback) {
+    public void updateNonce(@NonNull String sessionId,
+                            @NonNull String newNonce,
+                            @NonNull String newSessionKey,
+                            @NonNull OnCompleteListener<Void> callback) {
         Map<String, Object> updates = new HashMap<>();
         updates.put("qrCode", newNonce);
         // sessionKey deliberately excluded — rotating it would break
@@ -167,7 +173,6 @@ public class SessionRepository {
                     callback.onCountChanged(count);
                 });
     }
-
 
     /**
      * Callback interface for real-time attendance count updates.

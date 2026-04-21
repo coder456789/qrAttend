@@ -187,7 +187,8 @@ public class ScanQRActivity extends AppCompatActivity {
             String intentSessionId = getIntent().getStringExtra("session_id");
             if (intentSessionId != null && !intentSessionId.isEmpty()) {
                 sessionRepo.getSession(intentSessionId, session -> {
-                    if (session != null && session.getSessionKey() != null) {
+                    if (session != null && session.getSessionKey() != null
+                            && session.getSessionKey().length() >= 32) {
                         initializeScanner(session, student, uid);
                     } else {
                         tvScanStatus.setText(R.string.error_session_not_found);
@@ -223,13 +224,23 @@ public class ScanQRActivity extends AppCompatActivity {
                         return;
                     }
 
-                    // Use the first active session that has a valid sessionKey
+                    // Use the first active session that has a valid sessionKey and is not expired
                     for (com.google.firebase.firestore.DocumentSnapshot doc : querySnapshot.getDocuments()) {
                         AttendanceSession session = doc.toObject(AttendanceSession.class);
-                        if (session != null && session.isActive() && session.getSessionKey() != null) {
-                            initializeScanner(session, student, uid);
-                            return;
+                        if (session == null) continue;
+
+                        // Skip sessions with invalid short keys
+                        if (session.getSessionKey() == null
+                                || session.getSessionKey().length() < 32) continue;
+
+                        // Auto-deactivate expired sessions in Firestore
+                        if (session.isExpired()) {
+                            sessionRepo.endSession(doc.getId(), task -> { /* fire and forget */ });
+                            continue;
                         }
+
+                        initializeScanner(session, student, uid);
+                        return;
                     }
 
                     // No valid session found
