@@ -1,0 +1,7 @@
+com.qrattend.app.test.app-jetified-core-1.5.0-0 C:\Users\athar\.gradle\caches\8.13\transforms\84d48ebf8df0ed5fd390cdd3b61fea7d\transformed\jetified-core-1.5.0\res
+com.qrattend.app.test.app-jetified-annotation-experimental-1.3.1-1 C:\Users\athar\.gradle\caches\8.13\transforms\af636be8c271785e183e6a2faed5ce27\transformed\jetified-annotation-experimental-1.3.1\res
+com.qrattend.app.test.app-androidTest-2 C:\Users\athar\AndroidStudioProjects\qrAttendfinal\app\build\generated\res\resValues\androidTest\debug
+com.qrattend.app.test.app-updated_navigation_xml-3 C:\Users\athar\AndroidStudioProjects\qrAttendfinal\app\build\generated\updated_navigation_xml\debugAndroidTest
+com.qrattend.app.test.app-mergeDebugAndroidTestResources-4 C:\Users\athar\AndroidStudioProjects\qrAttendfinal\app\build\intermediates\incremental\debugAndroidTest\mergeDebugAndroidTestResources\merged.dir
+com.qrattend.app.test.app-mergeDebugAndroidTestResources-5 C:\Users\athar\AndroidStudioProjects\qrAttendfinal\app\build\intermediates\incremental\debugAndroidTest\mergeDebugAndroidTestResources\stripped.dir
+com.qrattend.app.test.app-debugAndroidTest-6 C:\Users\athar\AndroidStudioProjects\qrAttendfinal\app\build\intermediates\merged_res\debugAndroidTest\mergeDebugAndroidTestResources
