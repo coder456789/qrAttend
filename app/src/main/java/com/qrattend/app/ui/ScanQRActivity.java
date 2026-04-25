@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -27,6 +28,7 @@ import com.qrattend.app.data.repository.AttendanceRepository;
 import com.qrattend.app.data.repository.SessionRepository;
 import com.qrattend.app.data.repository.StudentRepository;
 import com.qrattend.app.firebase.AuthManager;
+import com.qrattend.app.location.GeoValidator;
 import com.qrattend.app.location.LocationHelper;
 import com.qrattend.app.proxy.ProxyDetectionEngine;
 import com.qrattend.app.qr.QRGeneratorUtil;
@@ -36,6 +38,7 @@ import com.qrattend.app.utils.Constants;
 
 public class ScanQRActivity extends AppCompatActivity {
 
+    private static final String TAG = "ScanQRActivity";
     private static final int PERMISSION_REQUEST_CODE = 100;
     private static final String[] REQUIRED_PERMISSIONS = {
             Manifest.permission.CAMERA,
@@ -164,7 +167,9 @@ public class ScanQRActivity extends AppCompatActivity {
         progressScan.setVisibility(View.VISIBLE);
 
         String uid = authManager.getCurrentUserId();
+        Log.d(TAG, "startScanFlow: uid=" + uid);
         if (uid == null) {
+            Log.e(TAG, "startScanFlow: user not logged in");
             tvScanStatus.setText(R.string.error_generic);
             return;
         }
@@ -172,34 +177,33 @@ public class ScanQRActivity extends AppCompatActivity {
         // Get student info first
         studentRepo.getStudent(uid, student -> {
             if (student == null) {
+                Log.e(TAG, "startScanFlow: student document not found for uid=" + uid);
                 progressScan.setVisibility(View.GONE);
-                tvScanStatus.setText(R.string.error_generic);
+                tvScanStatus.setText("Student profile not found.\nMake sure you are registered.");
                 return;
             }
-
-            // Get student's class to find active session
-            String className = student.getClassName();
-            // Try to find active sessions - for simplicity, get all classes
-            // and check for active sessions. In practice this would be filtered.
-            // Use a broad approach: try the class the student belongs to.
+            Log.d(TAG, "startScanFlow: student found — " + student.getName()
+                    + ", class=" + student.getClassName());
 
             // For the MVP, we check if there's a session ID passed via intent
             String intentSessionId = getIntent().getStringExtra("session_id");
+            Log.d(TAG, "startScanFlow: intentSessionId=" + intentSessionId);
+
             if (intentSessionId != null && !intentSessionId.isEmpty()) {
                 sessionRepo.getSession(intentSessionId, session -> {
                     if (session != null && session.getSessionKey() != null
                             && session.getSessionKey().length() >= 32) {
+                        Log.d(TAG, "startScanFlow: intent session found, initializing scanner");
                         initializeScanner(session, student, uid);
                     } else {
+                        Log.w(TAG, "startScanFlow: intent session invalid or not found");
                         tvScanStatus.setText(R.string.error_session_not_found);
                         progressScan.setVisibility(View.GONE);
                     }
                 });
             } else {
                 // No session ID passed — try to find any active session
-                // For now, scan with a placeholder and respond to QR content
-                // This is a known UX limitation when the student doesn't know
-                // which session is active. We'll try fetching by each enrolled class.
+                Log.d(TAG, "startScanFlow: no intent session, searching for active sessions...");
                 findActiveSessionAndScan(student, uid);
             }
         });
@@ -212,45 +216,79 @@ public class ScanQRActivity extends AppCompatActivity {
         com.google.firebase.firestore.FirebaseFirestore db =
                 com.google.firebase.firestore.FirebaseFirestore.getInstance();
 
+        Log.d(TAG, "Querying Firestore for active sessions in collection: " + Constants.SESSIONS);
+
         db.collection(Constants.SESSIONS)
                 .whereEqualTo("active", true)
                 .limit(5)
                 .get()
                 .addOnSuccessListener(querySnapshot -> {
                     if (querySnapshot == null || querySnapshot.isEmpty()) {
+                        Log.w(TAG, "No active sessions found in Firestore (query returned empty)");
                         progressScan.setVisibility(View.GONE);
-                        tvScanStatus.setText(R.string.error_session_not_found);
+                        tvScanStatus.setText("No active session found.\nMake sure the teacher has started a session.");
                         btnTryAgain.setVisibility(View.VISIBLE);
                         return;
                     }
 
+                    Log.d(TAG, "Found " + querySnapshot.size() + " active session(s). Checking validity...");
+
+                    int skippedNull = 0, skippedKey = 0, skippedExpired = 0;
+
                     // Use the first active session that has a valid sessionKey and is not expired
                     for (com.google.firebase.firestore.DocumentSnapshot doc : querySnapshot.getDocuments()) {
                         AttendanceSession session = doc.toObject(AttendanceSession.class);
-                        if (session == null) continue;
-
-                        // Skip sessions with invalid short keys
-                        if (session.getSessionKey() == null
-                                || session.getSessionKey().length() < 32) continue;
-
-                        // Auto-deactivate expired sessions in Firestore
-                        if (session.isExpired()) {
-                            sessionRepo.endSession(doc.getId(), task -> { /* fire and forget */ });
+                        if (session == null) {
+                            Log.w(TAG, "Session doc " + doc.getId() + " deserialized to null");
+                            skippedNull++;
                             continue;
                         }
 
+                        // Skip sessions with invalid short keys
+                        if (session.getSessionKey() == null
+                                || session.getSessionKey().length() < 32) {
+                            Log.w(TAG, "Session " + doc.getId() + " skipped: invalid key (length="
+                                    + (session.getSessionKey() != null ? session.getSessionKey().length() : "null") + ")");
+                            skippedKey++;
+                            continue;
+                        }
+
+                        // Auto-deactivate expired sessions in Firestore
+                        if (session.isExpired()) {
+                            Log.w(TAG, "Session " + doc.getId() + " skipped: expired"
+                                    + " (duration=" + session.getDurationMinutes() + "min"
+                                    + ", startTime=" + session.getStartTime() + ")");
+                            sessionRepo.endSession(doc.getId(), task -> { /* fire and forget */ });
+                            skippedExpired++;
+                            continue;
+                        }
+
+                        Log.d(TAG, "Valid session found: " + doc.getId()
+                                + " (subject=" + session.getSubject()
+                                + ", class=" + session.getClassName() + ")");
                         initializeScanner(session, student, uid);
                         return;
                     }
 
-                    // No valid session found
+                    // No valid session found — show detailed reason
+                    Log.w(TAG, "All sessions skipped: null=" + skippedNull
+                            + ", badKey=" + skippedKey + ", expired=" + skippedExpired);
                     progressScan.setVisibility(View.GONE);
-                    tvScanStatus.setText(R.string.error_session_not_found);
+                    String detail;
+                    if (skippedExpired > 0 && skippedKey == 0) {
+                        detail = "Session has expired.\nAsk the teacher to start a new session.";
+                    } else if (skippedKey > 0) {
+                        detail = "Session has invalid encryption key.\nAsk the teacher to restart.";
+                    } else {
+                        detail = getString(R.string.error_session_not_found);
+                    }
+                    tvScanStatus.setText(detail);
                     btnTryAgain.setVisibility(View.VISIBLE);
                 })
                 .addOnFailureListener(e -> {
+                    Log.e(TAG, "Firestore query FAILED: " + e.getMessage(), e);
                     progressScan.setVisibility(View.GONE);
-                    tvScanStatus.setText(R.string.error_session_not_found);
+                    tvScanStatus.setText("Failed to query sessions:\n" + e.getMessage());
                     btnTryAgain.setVisibility(View.VISIBLE);
                 });
     }
@@ -259,6 +297,10 @@ public class ScanQRActivity extends AppCompatActivity {
     private Student currentStudent;
     private String currentUid;
 
+    // Pre-fetched locations: starts collecting as soon as the scanner initializes.
+    // Multiple samples are stored so we can pick the NEAREST to teacher.
+    private volatile java.util.List<Location> preFetchedLocations;
+
     private void initializeScanner(AttendanceSession session, Student student, String uid) {
         this.currentSession = session;
         this.currentStudent = student;
@@ -266,6 +308,24 @@ public class ScanQRActivity extends AppCompatActivity {
 
         progressScan.setVisibility(View.GONE);
         tvScanStatus.setText(R.string.scan_instruction);
+
+        // PRE-FETCH: Start multi-sample GPS collection immediately while the
+        // student is pointing the camera. Collects ALL samples so we can
+        // pick the nearest to teacher later.
+        preFetchedLocations = null;
+        Log.d(TAG, "Starting multi-sample location pre-fetch...");
+        LocationHelper.fetchAllLocations(this, new LocationHelper.MultiLocationCallback() {
+            @Override
+            public void onLocationsCollected(java.util.List<Location> locations) {
+                preFetchedLocations = locations;
+                Log.d(TAG, "Pre-fetch complete: " + locations.size() + " samples collected");
+            }
+
+            @Override
+            public void onFailure(String reason) {
+                Log.w(TAG, "Location pre-fetch failed: " + reason);
+            }
+        });
 
         // QRScannerUtil constructor: (Context, PreviewView, LifecycleOwner, sessionKey)
         scanner = new QRScannerUtil(this, previewView, this, session.getSessionKey());
@@ -301,37 +361,108 @@ public class ScanQRActivity extends AppCompatActivity {
                 return;
             }
 
-            // Get current location via LocationHelper
-            LocationHelper.fetchCurrentLocation(ScanQRActivity.this,
-                    new LocationHelper.LocationCallback() {
-                        @Override
-                        public void onSuccess(Location location) {
-                            runOnUiThread(() -> validateAndMark(payload, location));
-                        }
+            // Check if pre-fetched locations are available and at least one is fresh
+            java.util.List<Location> prefetched = preFetchedLocations;
+            if (prefetched != null && !prefetched.isEmpty()) {
+                Log.d(TAG, "Using " + prefetched.size() + " pre-fetched locations");
+                runOnUiThread(() -> pickNearestAndProceed(payload, prefetched));
+            } else {
+                // Pre-fetch not ready — fetch fresh multi-sample
+                Log.d(TAG, "Pre-fetch not ready, fetching fresh multi-sample...");
+                tvScanStatus.setText(R.string.acquiring_location);
+                LocationHelper.fetchAllLocations(ScanQRActivity.this,
+                        new LocationHelper.MultiLocationCallback() {
+                            @Override
+                            public void onLocationsCollected(java.util.List<Location> locations) {
+                                runOnUiThread(() -> pickNearestAndProceed(payload, locations));
+                            }
 
-                        @Override
-                        public void onFailure(String reason) {
-                            runOnUiThread(() -> {
-                                progressScan.setVisibility(View.GONE);
-                                tvScanStatus.setText(R.string.error_location_unavailable);
-                                btnTryAgain.setVisibility(View.VISIBLE);
-                            });
-                        }
-                    });
+                            @Override
+                            public void onFailure(String reason) {
+                                runOnUiThread(() -> {
+                                    progressScan.setVisibility(View.GONE);
+                                    tvScanStatus.setText(R.string.error_location_unavailable);
+                                    btnTryAgain.setVisibility(View.VISIBLE);
+                                });
+                            }
+                        });
+            }
         });
+    }
+
+    /**
+     * From all collected GPS samples, picks the one NEAREST to the teacher's
+     * location and uses it for validation. Indoor GPS drifts in random directions,
+     * so the closest reading to the teacher is most likely the true position.
+     */
+    private void pickNearestAndProceed(QRGeneratorUtil.QRPayload payload,
+                                       java.util.List<Location> locations) {
+        double teacherLat = currentSession.getLatitude();
+        double teacherLng = currentSession.getLongitude();
+
+        Location nearest = null;
+        float nearestDist = Float.MAX_VALUE;
+
+        for (Location loc : locations) {
+            float dist = LocationHelper.distanceBetweenMeters(
+                    loc.getLatitude(), loc.getLongitude(), teacherLat, teacherLng);
+            Log.d(TAG, "Sample: accuracy=" + loc.getAccuracy() + "m, distance=" 
+                    + String.format("%.1f", dist) + "m from teacher");
+            if (dist < nearestDist) {
+                nearestDist = dist;
+                nearest = loc;
+            }
+        }
+
+        Log.d(TAG, "Picked nearest sample: distance=" + String.format("%.1f", nearestDist)
+                + "m, accuracy=" + nearest.getAccuracy() + "m (from " + locations.size() + " samples)");
+
+        // Warn if ALL samples show poor accuracy
+        if (nearest.hasAccuracy()
+                && nearest.getAccuracy() > Constants.TEACHER_MAX_ACCEPTABLE_ACCURACY) {
+            progressScan.setVisibility(View.GONE);
+            String msg = getString(R.string.warning_student_gps_poor,
+                    String.format("%.0f", nearest.getAccuracy()));
+            tvScanStatus.setText(msg);
+            btnTryAgain.setVisibility(View.VISIBLE);
+
+            final Location finalNearest = nearest;
+            new AlertDialog.Builder(ScanQRActivity.this)
+                    .setTitle("⚠ Poor GPS Signal")
+                    .setMessage(msg)
+                    .setPositiveButton(R.string.try_again, (d, w) -> {
+                        btnTryAgain.setVisibility(View.GONE);
+                        handlePayload(payload);
+                    })
+                    .setNegativeButton("Continue Anyway", (d, w) -> {
+                        validateAndMark(payload, finalNearest);
+                    })
+                    .show();
+            return;
+        }
+
+        validateAndMark(payload, nearest);
     }
 
     private void validateAndMark(QRGeneratorUtil.QRPayload payload, Location location) {
         String deviceFp = proxyEngine.getCurrentDeviceFingerprint();
 
+        Log.d(TAG, "=== VALIDATION START ===");
+        Log.d(TAG, "Student location: lat=" + location.getLatitude()
+                + ", lng=" + location.getLongitude()
+                + ", accuracy=" + location.getAccuracy() + "m");
+        Log.d(TAG, "Device fingerprint: " + deviceFp);
+
         // STEP 1: Register device BEFORE validation so first-time students aren't blocked.
         // registerDevice is idempotent — safe to call on every scan.
         new StudentRepository().registerDevice(currentUid, deviceFp, regTask -> {
+            Log.d(TAG, "Device registration result: " + (regTask.isSuccessful() ? "OK" : "FAILED"));
 
             // STEP 2: Re-fetch the session FRESH from Firestore so the nonce is always
             // the latest one (QRRefreshManager rotates it every 10 seconds).
             sessionRepo.getSession(payload.sessionId, freshSession -> {
                 if (freshSession == null || !freshSession.isActive()) {
+                    Log.w(TAG, "Session not found or inactive: " + payload.sessionId);
                     runOnUiThread(() -> {
                         progressScan.setVisibility(View.GONE);
                         tvScanStatus.setText(R.string.error_session_not_found);
@@ -340,11 +471,28 @@ public class ScanQRActivity extends AppCompatActivity {
                     return;
                 }
 
+                // Log session location info for debugging
+                Log.d(TAG, "Session location: lat=" + freshSession.getLatitude()
+                        + ", lng=" + freshSession.getLongitude()
+                        + ", geofenceRadius=" + freshSession.getGeofenceRadius() + "m");
+                float distToTeacher = GeoValidator.getDistanceToClassroom(
+                        location, freshSession.getLatitude(), freshSession.getLongitude());
+                Log.d(TAG, "Distance from teacher: " + String.format("%.1f", distToTeacher) + "m");
+
                 // STEP 3: Also re-fetch student so deviceId is definitely populated.
                 studentRepo.getStudent(currentUid, freshStudent -> {
+                    Log.d(TAG, "Student deviceId: "
+                            + (freshStudent != null ? freshStudent.getDeviceId() : "null"));
 
                     // STEP 4: Validate with fresh data.
                     proxyEngine.validate(payload, location, freshSession, freshStudent, result -> {
+                        Log.d(TAG, "Validation result: success=" + result.success
+                                + ", reason=" + result.rejectionReason);
+
+                        // Compute distance for UI display
+                        final float distance = GeoValidator.getDistanceToClassroom(
+                                location, freshSession.getLatitude(), freshSession.getLongitude());
+
                         runOnUiThread(() -> {
                             progressScan.setVisibility(View.GONE);
                             GeoPoint geoPoint = new GeoPoint(location.getLatitude(), location.getLongitude());
@@ -361,7 +509,7 @@ public class ScanQRActivity extends AppCompatActivity {
                                 );
                                 attendanceRepo.markAttendance(payload.sessionId, currentUid, record, task -> {
                                     if (task.isSuccessful()) {
-                                        showSuccessDialog();
+                                        showSuccessDialog(distance);
                                     } else {
                                         tvScanStatus.setText(R.string.error_generic);
                                         btnTryAgain.setVisibility(View.VISIBLE);
@@ -378,7 +526,7 @@ public class ScanQRActivity extends AppCompatActivity {
                                         payload.sessionId
                                 );
                                 attendanceRepo.markAttendance(payload.sessionId, currentUid, record, task -> {});
-                                showRejectionDialog(result.rejectionReason);
+                                showRejectionDialog(result.rejectionReason, distance, location);
                             }
                         });
                     });
@@ -387,23 +535,39 @@ public class ScanQRActivity extends AppCompatActivity {
         });
     }
 
-    private void showSuccessDialog() {
+    private void showSuccessDialog(float distanceMeters) {
+        String distanceText = String.format("%.1f", distanceMeters);
+        String message = getString(R.string.attendance_success_message)
+                + "\n\n📍 " + getString(R.string.distance_from_teacher, distanceText);
+
         new AlertDialog.Builder(this)
                 .setTitle(R.string.attendance_success)
-                .setMessage(R.string.attendance_success_message)
+                .setMessage(message)
                 .setPositiveButton(R.string.ok, (d, w) -> finish())
                 .setCancelable(false)
                 .show();
     }
 
-    private void showRejectionDialog(String reason) {
+    private void showRejectionDialog(String reason, float distanceMeters, Location studentLocation) {
         String readableReason = mapRejectionReason(reason);
+        String distanceText = String.format("%.1f", distanceMeters);
+
+        // Include GPS accuracy in the message so students understand why they were rejected
+        String accuracyNote = "";
+        if (studentLocation != null && studentLocation.hasAccuracy()) {
+            accuracyNote = "\n📡 GPS accuracy: ±" + String.format("%.0f", studentLocation.getAccuracy()) + "m";
+        }
+
+        String fullMessage = readableReason
+                + "\n\n📍 " + getString(R.string.distance_from_teacher, distanceText)
+                + accuracyNote;
+
         tvScanStatus.setText(readableReason);
         btnTryAgain.setVisibility(View.VISIBLE);
 
         new AlertDialog.Builder(this)
                 .setTitle(R.string.attendance_failed)
-                .setMessage(readableReason)
+                .setMessage(fullMessage)
                 .setPositiveButton(R.string.try_again, (d, w) -> {
                     btnTryAgain.setVisibility(View.GONE);
                     // Re-initialize scanner
@@ -420,9 +584,14 @@ public class ScanQRActivity extends AppCompatActivity {
         switch (reason) {
             case Constants.REASON_LOCATION_MISMATCH:
                 return getString(R.string.rejection_location_mismatch);
+            case "location_stale":
+                return "Location data is too old. Please try again.";
+            case "location_inaccurate":
+                return "GPS accuracy is too poor for validation. Move near a window.";
             case Constants.REASON_DEVICE_MISMATCH:
                 return getString(R.string.rejection_device_mismatch);
             case Constants.REASON_NONCE_EXPIRED:
+            case "nonce_mismatch":
                 return getString(R.string.rejection_nonce_expired);
             case Constants.REASON_ROOT_DETECTED:
                 return getString(R.string.rejection_root_detected);

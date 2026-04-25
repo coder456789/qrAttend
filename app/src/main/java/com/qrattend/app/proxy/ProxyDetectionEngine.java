@@ -147,10 +147,14 @@ public class ProxyDetectionEngine {
 
         // ── LAYER 3 — Nonce / Temporal Validation ───────────────────────────
         // session.getQrCode() = live nonce written by SessionRepository.updateNonce()
+        // FIX: Also pass previousQrCode + expiry so students delayed by GPS
+        //      collection can still validate against the recently-rotated nonce.
         ValidationResult nonceCheck = NonceManager.validateNonce(
                 payload.nonce,
                 session.getQrCode(),
-                payload.timestamp);
+                payload.timestamp,
+                session.getPreviousQrCode(),
+                session.getPreviousNonceExpiryMs());
         if (!nonceCheck.success) {
             callback.onResult(nonceCheck);
             return;
@@ -173,8 +177,10 @@ public class ProxyDetectionEngine {
                                             String deviceId,
                                             String deviceId2) {
         if (deviceId == null || deviceId.isEmpty()) {
-            // No device bound yet — StudentRepository.updateDeviceId() not called yet
-            return ValidationResult.fail(Constants.REASON_DEVICE_MISMATCH);
+            // No device bound yet — first-time student.
+            // ScanQRActivity.registerDevice() runs before this check,
+            // so allow and let the binding take effect on next scan.
+            return ValidationResult.pass();
         }
 
         // Check primary device (Student.deviceId)

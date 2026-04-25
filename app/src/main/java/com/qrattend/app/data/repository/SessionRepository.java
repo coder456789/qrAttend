@@ -111,13 +111,13 @@ public class SessionRepository {
     // ── Nonce / QR Update ───────────────────────────────────────────────
 
     /**
-     * Updates only the QR nonce in Firestore each refresh cycle.
+     * Updates the QR nonce in Firestore each refresh cycle.
      *
-     * FIX: Renamed from updateSecureNonce → updateNonce to match the method
-     * name used in QRRefreshManager.RefreshListener.onNewNonce() integration
-     * contract. The old name caused DisplayQRActivity to call a non-existent
-     * method, meaning the nonce was never written to Firestore and students
-     * always got a stale/null nonce → decrypt key mismatch.
+     * FIX (nonce grace window): Before overwriting {@code qrCode} with the
+     * new nonce, the CURRENT nonce is copied to {@code previousQrCode} with
+     * an expiry of {@code now + Constants.PREVIOUS_NONCE_GRACE_MS} (20s).
+     * This lets students who scanned the old QR but were delayed by GPS
+     * multi-sample collection (up to 14 seconds) still pass nonce validation.
      *
      * The sessionKey is intentionally NOT rotated — it must remain stable
      * so that the student's scanner (initialized once at session discovery)
@@ -127,14 +127,36 @@ public class SessionRepository {
                             @NonNull String newNonce,
                             @NonNull String newSessionKey,
                             @NonNull OnCompleteListener<Void> callback) {
-        Map<String, Object> updates = new HashMap<>();
-        updates.put("qrCode", newNonce);
-        // sessionKey deliberately excluded — rotating it would break
-        // any scanner that was initialized before the rotation.
-
+        // Step 1: Read the current nonce so we can preserve it as previousQrCode
         sessionsRef.document(sessionId)
-                .update(updates)
-                .addOnCompleteListener(callback);
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    Map<String, Object> updates = new HashMap<>();
+                    updates.put("qrCode", newNonce);
+
+                    // Preserve current nonce as previous with a grace window
+                    String currentNonce = snapshot.getString("qrCode");
+                    if (currentNonce != null && !currentNonce.isEmpty()) {
+                        updates.put("previousQrCode", currentNonce);
+                        updates.put("previousNonceExpiryMs",
+                                System.currentTimeMillis() + Constants.PREVIOUS_NONCE_GRACE_MS);
+                    }
+
+                    // sessionKey deliberately excluded — rotating it would break
+                    // any scanner that was initialized before the rotation.
+
+                    sessionsRef.document(sessionId)
+                            .update(updates)
+                            .addOnCompleteListener(callback);
+                })
+                .addOnFailureListener(e -> {
+                    // Fallback: write new nonce without preserving previous
+                    Map<String, Object> updates = new HashMap<>();
+                    updates.put("qrCode", newNonce);
+                    sessionsRef.document(sessionId)
+                            .update(updates)
+                            .addOnCompleteListener(callback);
+                });
     }
 
     // ── End Session ─────────────────────────────────────────────────────

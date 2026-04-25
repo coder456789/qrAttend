@@ -58,6 +58,7 @@ public class StartSessionActivity extends AppCompatActivity {
     private List<String> classDocIds = new ArrayList<>();
 
     private double latitude = 0, longitude = 0;
+    private float locationAccuracy = Float.MAX_VALUE;
     private boolean locationSet = false;
 
     @Override
@@ -141,18 +142,38 @@ public class StartSessionActivity extends AppCompatActivity {
         progressLocation.setVisibility(View.VISIBLE);
         btnGetLocation.setEnabled(false);
 
-        LocationHelper.fetchCurrentLocation(this, new LocationHelper.LocationCallback() {
+        // Teacher uses quick fetch (1-2 samples max, ~5 seconds).
+        // Indoor accuracy will be low — that's fine for the anchor point.
+        LocationHelper.fetchQuickLocation(this, new LocationHelper.LocationCallback() {
             @Override
             public void onSuccess(Location location) {
                 runOnUiThread(() -> {
-                    latitude    = location.getLatitude();
-                    longitude   = location.getLongitude();
-                    locationSet = true;
+                    latitude         = location.getLatitude();
+                    longitude        = location.getLongitude();
+                    locationAccuracy = location.hasAccuracy() ? location.getAccuracy() : Float.MAX_VALUE;
+                    locationSet      = true;
                     tvLocationLabel.setText(R.string.get_my_location);
-                    tvLocationCoords.setText(getString(R.string.location_fetched, latitude, longitude));
+
+                    // Show coordinates AND accuracy so the teacher knows if the GPS fix
+                    // is reliable. Indoor GPS can be 50–200m off — if accuracy is poor
+                    // the teacher should step near a window and retry.
+                    String accuracyText = location.hasAccuracy()
+                            ? String.format(" (±%.0fm)", location.getAccuracy())
+                            : "";
+                    tvLocationCoords.setText(getString(R.string.location_fetched,
+                            latitude, longitude) + accuracyText);
                     tvLocationCoords.setVisibility(View.VISIBLE);
                     progressLocation.setVisibility(View.GONE);
                     btnGetLocation.setEnabled(true);
+
+                    // Warn teacher if accuracy is worse than the geofence radius
+                    if (location.hasAccuracy()
+                            && location.getAccuracy() > Constants.DEFAULT_GEOFENCE_RADIUS) {
+                        Toast.makeText(StartSessionActivity.this,
+                                "⚠ GPS accuracy is ±" + String.format("%.0f", location.getAccuracy())
+                                        + "m — move near a window and tap again for a better fix.",
+                                Toast.LENGTH_LONG).show();
+                    }
                 });
             }
 
@@ -186,6 +207,19 @@ public class StartSessionActivity extends AppCompatActivity {
 
         if (!locationSet) {
             Toast.makeText(this, getString(R.string.error_get_location), Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Quality gate: block session start if teacher GPS accuracy is too poor.
+        // A bad anchor point means ALL students will be at wrong distances.
+        if (locationAccuracy > Constants.TEACHER_MAX_ACCEPTABLE_ACCURACY) {
+            new AlertDialog.Builder(this)
+                    .setTitle("⚠ Poor GPS Accuracy")
+                    .setMessage(getString(R.string.error_teacher_gps_poor,
+                            String.format("%.0f", locationAccuracy)))
+                    .setPositiveButton("Retry Location", (d, w) -> fetchLocation())
+                    .setNegativeButton(R.string.cancel, null)
+                    .show();
             return;
         }
 

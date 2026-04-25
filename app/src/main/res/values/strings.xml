@@ -63,6 +63,7 @@
     <string name="validating">Validating attendance…</string>
     <string name="attendance_success">Attendance Marked!</string>
     <string name="attendance_success_message">Your attendance has been recorded successfully.</string>
+    <string name="distance_from_teacher">📍 Distance from teacher: %1$s meters</string>
     <string name="attendance_failed">Attendance Rejected</string>
     <string name="try_again">Try Again</string>
     <string name="error_camera_permission">Camera permission is required to scan QR codes</string>
@@ -75,6 +76,9 @@
     <string name="rejection_device_mismatch">This device is not registered to your account.</string>
     <string name="rejection_nonce_expired">QR code has expired. Wait for the next one.</string>
     <string name="rejection_root_detected">Rooted or emulated device detected.</string>
+    <string name="acquiring_location">Acquiring precise location…</string>
+    <string name="warning_student_gps_poor">GPS accuracy is poor (±%1$sm).\nMove near a window and try again for a better fix.</string>
+    <string name="error_teacher_gps_poor">Your GPS accuracy is ±%1$sm, which is too poor to start a session.\n\nStudents near you may be wrongly rejected.\n\nMove near a window or step outside and retry.</string>
     <string name="ok">OK</string>
 
     <!-- Teacher Dashboard -->

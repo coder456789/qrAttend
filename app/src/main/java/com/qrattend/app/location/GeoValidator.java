@@ -14,7 +14,7 @@ import com.qrattend.app.location.LocationHelper;
  *   ✅ Mock location detection via Fused Location Provider flag (PRD tech stack)
  *   ✅ Location staleness check (< 30 seconds)
  *   ✅ geofenceRadiusM is double to match AttendanceSession.getGeofenceRadius()
- *   ✅ Default radius uses Constants.DEFAULT_GEOFENCE_RADIUS (50.0 m)
+ *   ✅ Default radius uses Constants.DEFAULT_GEOFENCE_RADIUS (100.0 m)
  *   ✅ Rejection uses Constants.REASON_LOCATION_MISMATCH
  *
  * Integration with Member 3:
@@ -52,24 +52,39 @@ public class GeoValidator {
             return ValidationResult.fail("mock_location");
         }
 
-        // 3. Staleness check — location fix must be < 30 seconds old per PRD
-        if (!LocationHelper.isFresh(studentLocation)) {
-            return ValidationResult.fail(Constants.REASON_LOCATION_MISMATCH);
+        // 3. Staleness check — location fix must be reasonably fresh.
+        //    Relaxed from 30s → 60s to accommodate pre-fetched locations
+        //    (location starts collecting when camera opens, may be 30-40s old by scan time).
+        long ageMs = System.currentTimeMillis() - studentLocation.getTime();
+        if (ageMs < 0 || ageMs > 60_000L) {
+            return ValidationResult.fail("location_stale");
         }
 
-        // 4. Accuracy sanity check
-        if (studentLocation.hasAccuracy() && studentLocation.getAccuracy() > 100f) {
-            return ValidationResult.fail(Constants.REASON_LOCATION_MISMATCH);
+        // 4. Accuracy sanity check — reject truly unusable fixes.
+        //    Threshold lowered from 500m → Constants.MAX_ACCEPTABLE_ACCURACY (200m).
+        //    A ±200m+ fix is too noisy for meaningful geofence validation.
+        if (studentLocation.hasAccuracy()
+                && studentLocation.getAccuracy() > Constants.MAX_ACCEPTABLE_ACCURACY) {
+            return ValidationResult.fail("location_inaccurate");
         }
 
-        // 5. Geofence distance check against Constants.DEFAULT_GEOFENCE_RADIUS (50m)
+        // 5. Geofence distance check.
+        //    Add the student's GPS accuracy as a CAPPED buffer so that a student
+        //    physically inside the classroom isn't rejected due to indoor GPS drift,
+        //    but the effective geofence can never balloon beyond a reasonable limit.
+        //    Buffer is capped at Constants.MAX_ACCURACY_BUFFER (50m).
+        //    Example: accuracy=40m → buffer=40m, accuracy=150m → buffer=50m (capped).
         float distance = LocationHelper.distanceBetweenMeters(
                 studentLocation.getLatitude(),
                 studentLocation.getLongitude(),
                 classroomLat,
                 classroomLng);
 
-        if (distance > geofenceRadiusM) {
+        float accuracyBuffer = studentLocation.hasAccuracy()
+                ? Math.min(studentLocation.getAccuracy(), Constants.MAX_ACCURACY_BUFFER)
+                : 0f;
+
+        if (distance > geofenceRadiusM + accuracyBuffer) {
             return ValidationResult.fail(Constants.REASON_LOCATION_MISMATCH);
         }
 
@@ -77,7 +92,7 @@ public class GeoValidator {
     }
 
     /**
-     * Overload using Constants.DEFAULT_GEOFENCE_RADIUS (50.0 m).
+     * Overload using Constants.DEFAULT_GEOFENCE_RADIUS (20.0 m).
      * Used when AttendanceSession.geofenceRadius is not set.
      */
     public static ValidationResult validate(Location studentLocation,

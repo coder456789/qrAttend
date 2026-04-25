@@ -35,6 +35,18 @@ public class AttendanceSession {
     /** Current QR nonce/token, rotated every ~10 seconds while the session is active. */
     private String qrCode;
 
+    /**
+     * Previous QR nonce — retained for a grace window (20s) after the current nonce rotates.
+     * Students who scanned the old QR but were delayed by GPS collection can still validate.
+     */
+    private String previousQrCode;
+
+    /**
+     * Epoch millis when {@code previousQrCode} expires and should no longer be accepted.
+     * Set to {@code System.currentTimeMillis() + PREVIOUS_NONCE_GRACE_MS} at each rotation.
+     */
+    private long previousNonceExpiryMs;
+
     /** Classroom GPS latitude. */
     private double latitude;
 
@@ -116,6 +128,12 @@ public class AttendanceSession {
 
     public String getQrCode() { return qrCode; }
     public void setQrCode(String qrCode) { this.qrCode = qrCode; }
+
+    public String getPreviousQrCode() { return previousQrCode; }
+    public void setPreviousQrCode(String previousQrCode) { this.previousQrCode = previousQrCode; }
+
+    public long getPreviousNonceExpiryMs() { return previousNonceExpiryMs; }
+    public void setPreviousNonceExpiryMs(long previousNonceExpiryMs) { this.previousNonceExpiryMs = previousNonceExpiryMs; }
 
     public double getLatitude() { return latitude; }
     public void setLatitude(double latitude) { this.latitude = latitude; }
