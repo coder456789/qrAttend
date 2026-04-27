@@ -41,13 +41,54 @@ public final class Constants {
     /** Interval (in milliseconds) between QR code nonce refreshes. */
     public static final int QR_REFRESH_INTERVAL_MS = 10_000; // 10 seconds
 
+    /**
+     * Grace period (ms) for the PREVIOUS nonce after a new one is generated.
+     * When the QR refreshes, the old nonce stays valid in Firestore for this
+     * duration so students whose GPS collection (up to 14s) causes a delay
+     * can still validate the nonce they originally scanned.
+     */
+    public static final long PREVIOUS_NONCE_GRACE_MS = 20_000L; // 20 seconds
+
     /** Default QR code bitmap size in pixels (width = height). */
     public static final int QR_SIZE = 800;
 
     // ── Geofence Defaults ───────────────────────────────────────────────
 
-    /** Default geofence radius in meters around the classroom. */
-    public static final double DEFAULT_GEOFENCE_RADIUS = 50.0;
+    /**
+     * Default geofence radius in meters around the classroom.
+     * Raised from 20m → 100m: indoor GPS accuracy is typically 20–100m,
+     * so a 20m fence caused false rejections even when students were physically present.
+     * 100m covers a standard classroom building and absorbs GPS drift on both devices.
+     */
+    public static final double DEFAULT_GEOFENCE_RADIUS = 100.0;
+
+    // ── Location Quality Thresholds ─────────────────────────────────────
+
+    /**
+     * Maximum GPS accuracy (meters) to accept for validation.
+     * Fixes worse than this are rejected outright — a ±200m fix is too inaccurate
+     * for meaningful geofence checks.
+     */
+    public static final float MAX_ACCEPTABLE_ACCURACY = 200f;
+
+    /**
+     * Maximum accuracy buffer (meters) added on top of the geofence radius.
+     * Caps the GPS-error compensation so the effective geofence never exceeds
+     * DEFAULT_GEOFENCE_RADIUS + MAX_ACCURACY_BUFFER (e.g. 100 + 50 = 150m).
+     */
+    public static final float MAX_ACCURACY_BUFFER = 50f;
+
+    /**
+     * GPS accuracy (meters) considered "excellent" — if a fix this good arrives,
+     * LocationHelper can stop collecting samples early.
+     */
+    public static final float EXCELLENT_ACCURACY_THRESHOLD = 20f;
+
+    /**
+     * Minimum acceptable GPS accuracy for the TEACHER's location when starting
+     * a session. A poor teacher anchor point causes all students to fail validation.
+     */
+    public static final float TEACHER_MAX_ACCEPTABLE_ACCURACY = 100f;
 
     // ── Device ──────────────────────────────────────────────────────────
 

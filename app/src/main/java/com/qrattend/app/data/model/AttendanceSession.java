@@ -35,6 +35,18 @@ public class AttendanceSession {
     /** Current QR nonce/token, rotated every ~10 seconds while the session is active. */
     private String qrCode;
 
+    /**
+     * Previous QR nonce — retained for a grace window (20s) after the current nonce rotates.
+     * Students who scanned the old QR but were delayed by GPS collection can still validate.
+     */
+    private String previousQrCode;
+
+    /**
+     * Epoch millis when {@code previousQrCode} expires and should no longer be accepted.
+     * Set to {@code System.currentTimeMillis() + PREVIOUS_NONCE_GRACE_MS} at each rotation.
+     */
+    private long previousNonceExpiryMs;
+
     /** Classroom GPS latitude. */
     private double latitude;
 
@@ -46,7 +58,16 @@ public class AttendanceSession {
 
     /** Timestamp when the session was started. */
     private Timestamp startTime;
+
+    /** AES-256 session key used to encrypt/decrypt QR payloads. */
     private String sessionKey;
+
+    /**
+     * Session duration in minutes, stored so expiry can be computed even if the app crashes.
+     * FIX: was missing from constructor — defaulted to 0, making isExpired() always return false.
+     */
+    private int durationMinutes;
+
     /** Timestamp when the session ended; {@code null} while the session is active. */
     private Timestamp endTime;
 
@@ -61,31 +82,38 @@ public class AttendanceSession {
 
     /**
      * Full constructor for creating new AttendanceSession instances.
+     *
+     * FIX: Added {@code durationMinutes} parameter — it was previously missing,
+     * causing the field to always be 0 and {@link #isExpired()} to always
+     * return {@code false}, so stale sessions were never auto-expired.
      */
     public AttendanceSession(String classId, String className, String subject, String teacherId,
-                             String qrCode,String sessionKey, double latitude, double longitude,
-                             double geofenceRadius, Timestamp startTime, Timestamp endTime, boolean active) {
-        this.classId = classId;
-        this.className = className; 
-        this.subject = subject;
-        this.teacherId = teacherId;
-        this.qrCode = qrCode;
-        this.sessionKey = sessionKey;
-        this.latitude = latitude;
-        this.longitude = longitude;
-        this.geofenceRadius = geofenceRadius;
-        this.startTime = startTime;
-        this.endTime = endTime;
-        this.active = active;
-
+                             String qrCode, String sessionKey, double latitude, double longitude,
+                             double geofenceRadius, Timestamp startTime, int durationMinutes,
+                             Timestamp endTime, boolean active) {
+        this.classId         = classId;
+        this.className       = className;
+        this.subject         = subject;
+        this.teacherId       = teacherId;
+        this.qrCode          = qrCode;
+        this.sessionKey      = sessionKey;
+        this.latitude        = latitude;
+        this.longitude       = longitude;
+        this.geofenceRadius  = geofenceRadius;
+        this.startTime       = startTime;
+        this.durationMinutes = durationMinutes; // FIX: was never assigned before
+        this.endTime         = endTime;
+        this.active          = active;
     }
 
     // ── Getters and Setters ─────────────────────────────────────────────
 
     public String getSessionId() { return sessionId; }
     public void setSessionId(String sessionId) { this.sessionId = sessionId; }
+
     public String getSessionKey() { return sessionKey; }
     public void setSessionKey(String sessionKey) { this.sessionKey = sessionKey; }
+
     public String getClassId() { return classId; }
     public void setClassId(String classId) { this.classId = classId; }
 
@@ -100,6 +128,12 @@ public class AttendanceSession {
 
     public String getQrCode() { return qrCode; }
     public void setQrCode(String qrCode) { this.qrCode = qrCode; }
+
+    public String getPreviousQrCode() { return previousQrCode; }
+    public void setPreviousQrCode(String previousQrCode) { this.previousQrCode = previousQrCode; }
+
+    public long getPreviousNonceExpiryMs() { return previousNonceExpiryMs; }
+    public void setPreviousNonceExpiryMs(long previousNonceExpiryMs) { this.previousNonceExpiryMs = previousNonceExpiryMs; }
 
     public double getLatitude() { return latitude; }
     public void setLatitude(double latitude) { this.latitude = latitude; }
@@ -116,8 +150,23 @@ public class AttendanceSession {
     public Timestamp getEndTime() { return endTime; }
     public void setEndTime(Timestamp endTime) { this.endTime = endTime; }
 
+    public int getDurationMinutes() { return durationMinutes; }
+    public void setDurationMinutes(int durationMinutes) { this.durationMinutes = durationMinutes; }
+
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+
+    /**
+     * Returns true if the session has exceeded its duration.
+     * Used by the student side to skip/auto-deactivate stale sessions
+     * when the teacher's app crashed without calling endSession().
+     */
+    public boolean isExpired() {
+        if (startTime == null || durationMinutes <= 0) return false;
+        long startMs = startTime.toDate().getTime();
+        long endMs   = startMs + (durationMinutes * 60 * 1000L);
+        return System.currentTimeMillis() > endMs;
+    }
 
     @Override
     public String toString() {

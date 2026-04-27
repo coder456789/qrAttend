@@ -28,8 +28,13 @@ public class NonceManager {
      */
     public static final long NONCE_VALIDITY_MS = Constants.QR_REFRESH_INTERVAL_MS;
 
-    /** Allowed clock skew between teacher and student devices. */
-    public static final long CLOCK_SKEW_MS = 15_000L;
+    /**
+     * Allowed clock skew + processing delay between teacher and student devices.
+     * Increased from 15s to 30s to accommodate multi-sample location collection
+     * (LocationHelper collects up to 5 GPS samples over ~12-14 seconds after the
+     * QR is scanned, so by validation time the nonce may have rotated once).
+     */
+    public static final long CLOCK_SKEW_MS = 30_000L;
 
     private static final int NONCE_BYTE_LENGTH = 24; // 192 bits → 32-char Base64
 
@@ -56,6 +61,8 @@ public class NonceManager {
 
     /**
      * Validates a scanned nonce against the session's current nonce and timestamp.
+     * Does NOT check the previous nonce grace window — use the overloaded version
+     * with previousNonce parameters for full grace-window support.
      *
      * @param scannedNonce   Nonce extracted from the decrypted QR payload
      * @param sessionNonce   AttendanceSession.getQrCode() from SessionRepository.getSession()
@@ -65,6 +72,30 @@ public class NonceManager {
     public static ValidationResult validateNonce(String scannedNonce,
                                                  String sessionNonce,
                                                  long   qrTimestamp) {
+        return validateNonce(scannedNonce, sessionNonce, qrTimestamp, null, 0L);
+    }
+
+    /**
+     * Validates a scanned nonce against the session's current nonce AND the
+     * previous nonce (if still within its grace window).
+     *
+     * FIX: When the QR refreshes every 10s, the old nonce is preserved in
+     * Firestore as {@code previousQrCode} with a 20-second grace period.
+     * Students whose GPS multi-sample collection (up to 14s) delays validation
+     * can still pass by matching the previous nonce.
+     *
+     * @param scannedNonce           Nonce from the decrypted QR payload
+     * @param sessionNonce           Current AttendanceSession.getQrCode()
+     * @param qrTimestamp            Epoch millis embedded in the QR payload
+     * @param previousNonce          AttendanceSession.getPreviousQrCode() (nullable)
+     * @param previousNonceExpiryMs  AttendanceSession.getPreviousNonceExpiryMs()
+     * @return                       ValidationResult
+     */
+    public static ValidationResult validateNonce(String scannedNonce,
+                                                 String sessionNonce,
+                                                 long   qrTimestamp,
+                                                 String previousNonce,
+                                                 long   previousNonceExpiryMs) {
         long now = System.currentTimeMillis();
         long age = now - qrTimestamp;
 
@@ -73,12 +104,19 @@ public class NonceManager {
             return ValidationResult.fail(Constants.REASON_NONCE_EXPIRED);
         }
 
-        // Nonce match — must equal AttendanceSession.getQrCode() from Firestore
-        if (scannedNonce == null || !scannedNonce.equals(sessionNonce)) {
-            return ValidationResult.fail("nonce_mismatch");
+        // Check 1: Match against current nonce
+        if (scannedNonce != null && scannedNonce.equals(sessionNonce)) {
+            return ValidationResult.pass();
         }
 
-        return ValidationResult.pass();
+        // Check 2: Match against previous nonce (grace window)
+        if (previousNonce != null && !previousNonce.isEmpty()
+                && scannedNonce != null && scannedNonce.equals(previousNonce)
+                && now <= previousNonceExpiryMs) {
+            return ValidationResult.pass();
+        }
+
+        return ValidationResult.fail("nonce_mismatch");
     }
 
     // -----------------------------------------------------------------------

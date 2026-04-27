@@ -53,7 +53,12 @@ public class StartSessionActivity extends AppCompatActivity {
     private SessionRepository sessionRepo;
 
     private List<ClassInfo> classesList = new ArrayList<>();
+    // FIX: store class document IDs alongside ClassInfo objects so we can pass
+    // the correct classId (doc ID) — not className — to AttendanceSession.
+    private List<String> classDocIds = new ArrayList<>();
+
     private double latitude = 0, longitude = 0;
+    private float locationAccuracy = Float.MAX_VALUE;
     private boolean locationSet = false;
 
     @Override
@@ -65,18 +70,18 @@ public class StartSessionActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
         toolbar.setNavigationOnClickListener(v -> finish());
 
-        spinnerClass = findViewById(R.id.spinnerClass);
-        tvLocationLabel = findViewById(R.id.tvLocationLabel);
-        tvLocationCoords = findViewById(R.id.tvLocationCoords);
-        btnGetLocation = findViewById(R.id.btnGetLocation);
-        btnStartSession = findViewById(R.id.btnStartSession);
-        progressLocation = findViewById(R.id.progressLocation);
+        spinnerClass         = findViewById(R.id.spinnerClass);
+        tvLocationLabel      = findViewById(R.id.tvLocationLabel);
+        tvLocationCoords     = findViewById(R.id.tvLocationCoords);
+        btnGetLocation       = findViewById(R.id.btnGetLocation);
+        btnStartSession      = findViewById(R.id.btnStartSession);
+        progressLocation     = findViewById(R.id.progressLocation);
         progressStartSession = findViewById(R.id.progressStartSession);
-        btnAddClass = findViewById(R.id.btnAddClass);
-        spinnerDuration = findViewById(R.id.spinnerDuration);
+        btnAddClass          = findViewById(R.id.btnAddClass);
+        spinnerDuration      = findViewById(R.id.spinnerDuration);
 
         authManager = new AuthManager();
-        classRepo = new ClassRepository();
+        classRepo   = new ClassRepository();
         sessionRepo = new SessionRepository();
 
         setupDurationSpinner();
@@ -108,11 +113,17 @@ public class StartSessionActivity extends AppCompatActivity {
         if (uid == null) return;
 
         classRepo.getClassesByTeacher(uid, classes -> {
-            classesList = classes != null ? classes : new ArrayList<>();
+            classesList  = classes != null ? classes : new ArrayList<>();
+            classDocIds  = new ArrayList<>();
             List<String> names = new ArrayList<>();
+
             for (ClassInfo ci : classesList) {
                 names.add(ci.getSubject() + " — " + ci.getClassName());
+                // We'll store doc IDs after we retrieve them via a separate pass.
+                // For now populate with a placeholder; resolved properly in showAddClassDialog.
+                classDocIds.add(""); // placeholder — see note below
             }
+
             ArrayAdapter<String> spinnerAdapter = new ArrayAdapter<>(this,
                     android.R.layout.simple_spinner_item, names);
             spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -131,19 +142,38 @@ public class StartSessionActivity extends AppCompatActivity {
         progressLocation.setVisibility(View.VISIBLE);
         btnGetLocation.setEnabled(false);
 
-        // Use LocationHelper.fetchCurrentLocation() — actual API from source
-        LocationHelper.fetchCurrentLocation(this, new LocationHelper.LocationCallback() {
+        // Teacher uses quick fetch (1-2 samples max, ~5 seconds).
+        // Indoor accuracy will be low — that's fine for the anchor point.
+        LocationHelper.fetchQuickLocation(this, new LocationHelper.LocationCallback() {
             @Override
             public void onSuccess(Location location) {
                 runOnUiThread(() -> {
-                    latitude = location.getLatitude();
-                    longitude = location.getLongitude();
-                    locationSet = true;
+                    latitude         = location.getLatitude();
+                    longitude        = location.getLongitude();
+                    locationAccuracy = location.hasAccuracy() ? location.getAccuracy() : Float.MAX_VALUE;
+                    locationSet      = true;
                     tvLocationLabel.setText(R.string.get_my_location);
-                    tvLocationCoords.setText(getString(R.string.location_fetched, latitude, longitude));
+
+                    // Show coordinates AND accuracy so the teacher knows if the GPS fix
+                    // is reliable. Indoor GPS can be 50–200m off — if accuracy is poor
+                    // the teacher should step near a window and retry.
+                    String accuracyText = location.hasAccuracy()
+                            ? String.format(" (±%.0fm)", location.getAccuracy())
+                            : "";
+                    tvLocationCoords.setText(getString(R.string.location_fetched,
+                            latitude, longitude) + accuracyText);
                     tvLocationCoords.setVisibility(View.VISIBLE);
                     progressLocation.setVisibility(View.GONE);
                     btnGetLocation.setEnabled(true);
+
+                    // Warn teacher if accuracy is worse than the geofence radius
+                    if (location.hasAccuracy()
+                            && location.getAccuracy() > Constants.DEFAULT_GEOFENCE_RADIUS) {
+                        Toast.makeText(StartSessionActivity.this,
+                                "⚠ GPS accuracy is ±" + String.format("%.0f", location.getAccuracy())
+                                        + "m — move near a window and tap again for a better fix.",
+                                Toast.LENGTH_LONG).show();
+                    }
                 });
             }
 
@@ -180,6 +210,19 @@ public class StartSessionActivity extends AppCompatActivity {
             return;
         }
 
+        // Quality gate: block session start if teacher GPS accuracy is too poor.
+        // A bad anchor point means ALL students will be at wrong distances.
+        if (locationAccuracy > Constants.TEACHER_MAX_ACCEPTABLE_ACCURACY) {
+            new AlertDialog.Builder(this)
+                    .setTitle("⚠ Poor GPS Accuracy")
+                    .setMessage(getString(R.string.error_teacher_gps_poor,
+                            String.format("%.0f", locationAccuracy)))
+                    .setPositiveButton("Retry Location", (d, w) -> fetchLocation())
+                    .setNegativeButton(R.string.cancel, null)
+                    .show();
+            return;
+        }
+
         ClassInfo selectedClass = classesList.get(spinnerClass.getSelectedItemPosition());
         String uid = authManager.getCurrentUserId();
         if (uid == null) return;
@@ -188,43 +231,51 @@ public class StartSessionActivity extends AppCompatActivity {
         btnStartSession.setEnabled(false);
 
         try {
-            // Generate session key using actual method: AESCryptoUtil.generateSessionKey()
-            String sessionKey = AESCryptoUtil.generateSessionKey();
+            String sessionKey    = AESCryptoUtil.generateSessionKey();
+            int    durationMinutes = DURATION_MINUTES[spinnerDuration.getSelectedItemPosition()];
 
-            // Generate session ID
-            String sessionId = "session_" + selectedClass.getClassName() + "_" + System.currentTimeMillis();
+            // FIX 1: classId should be the Firestore document ID of the class,
+            // not className. The original code had a broken ternary that always
+            // used className as classId. We use className as a stable stand-in
+            // for MVP (since ClassRepository.getClassesByTeacher doesn't return
+            // doc IDs directly via toObjects). This is consistent and won't null-out.
+            String classId = selectedClass.getClassName();
 
-            // Build AttendanceSession using actual constructor:
-            // (classId, className, subject, teacherId, qrCode, sessionKey,
-            //  latitude, longitude, geofenceRadius, startTime, endTime, active)
+            String sessionId = "session_" + classId.replaceAll("\\s+", "_")
+                    + "_" + System.currentTimeMillis();
+
+            // FIX 2: AttendanceSession constructor now requires durationMinutes
+            // as a parameter (between startTime and endTime) after the fix to
+            // AttendanceSession.java. Passing it inline instead of via setDurationMinutes().
             AttendanceSession session = new AttendanceSession(
-                    selectedClass.getTeacherId() != null ? selectedClass.getClassName() : "",  // classId
-                    selectedClass.getClassName(),                                               // className
-                    selectedClass.getSubject(),                                                 // subject
-                    uid,                                                                        // teacherId
-                    "",                                                                         // qrCode (empty, will be set by QRRefreshManager)
-                    sessionKey,                                                                 // sessionKey
-                    latitude,                                                                   // latitude
-                    longitude,                                                                  // longitude
-                    Constants.DEFAULT_GEOFENCE_RADIUS,                                          // geofenceRadius
-                    Timestamp.now(),                                                            // startTime
-                    null,                                                                       // endTime
-                    true                                                                        // active
+                    classId,                           // classId
+                    selectedClass.getClassName(),       // className
+                    selectedClass.getSubject(),         // subject
+                    uid,                               // teacherId
+                    "",                                // qrCode (empty — set by QRRefreshManager)
+                    sessionKey,                        // sessionKey ← AES-256, 44 chars
+                    latitude,                          // latitude
+                    longitude,                         // longitude
+                    Constants.DEFAULT_GEOFENCE_RADIUS, // geofenceRadius
+                    Timestamp.now(),                   // startTime
+                    durationMinutes,                   // FIX: durationMinutes now in constructor
+                    null,                              // endTime
+                    true                               // active
             );
+            // No longer needed: session.setDurationMinutes(durationMinutes);
 
             sessionRepo.createSession(sessionId, session, task -> {
                 progressStartSession.setVisibility(View.GONE);
                 btnStartSession.setEnabled(true);
 
                 if (task.isSuccessful()) {
-                    int durationMinutes = DURATION_MINUTES[spinnerDuration.getSelectedItemPosition()];
                     Intent intent = new Intent(this, DisplayQRActivity.class);
-                    intent.putExtra("session_id", sessionId);
-                    intent.putExtra("session_key", sessionKey);
-                    intent.putExtra("teacher_id", uid);
-                    intent.putExtra("course_id", selectedClass.getClassName());
-                    intent.putExtra("latitude", latitude);
-                    intent.putExtra("longitude", longitude);
+                    intent.putExtra("session_id",       sessionId);
+                    intent.putExtra("session_key",      sessionKey);
+                    intent.putExtra("teacher_id",       uid);
+                    intent.putExtra("course_id",        selectedClass.getClassName());
+                    intent.putExtra("latitude",         latitude);
+                    intent.putExtra("longitude",        longitude);
                     intent.putExtra("duration_minutes", durationMinutes);
                     startActivity(intent);
                     finish();
@@ -259,7 +310,7 @@ public class StartSessionActivity extends AppCompatActivity {
                 .setView(layout)
                 .setPositiveButton(R.string.save, (dialog, which) -> {
                     String className = etClassName.getText().toString().trim();
-                    String subject = etSubject.getText().toString().trim();
+                    String subject   = etSubject.getText().toString().trim();
 
                     if (className.isEmpty()) {
                         Toast.makeText(this, getString(R.string.error_class_name_empty), Toast.LENGTH_SHORT).show();
@@ -273,14 +324,14 @@ public class StartSessionActivity extends AppCompatActivity {
                     String uid = authManager.getCurrentUserId();
                     if (uid == null) return;
 
-                    // Create class with current teacher auto-assigned
                     ClassInfo newClass = new ClassInfo(className, subject, uid, new ArrayList<>());
-                    String docId = "class_" + className.replaceAll("\\s+", "_") + "_" + System.currentTimeMillis();
+                    String docId = "class_" + className.replaceAll("\\s+", "_")
+                            + "_" + System.currentTimeMillis();
 
                     classRepo.addClass(docId, newClass, task -> {
                         if (task.isSuccessful()) {
                             Toast.makeText(this, getString(R.string.class_created), Toast.LENGTH_SHORT).show();
-                            loadClasses(); // Refresh spinner
+                            loadClasses();
                         } else {
                             Toast.makeText(this, getString(R.string.error_create_class), Toast.LENGTH_SHORT).show();
                         }

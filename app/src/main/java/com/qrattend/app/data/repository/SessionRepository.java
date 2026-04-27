@@ -28,7 +28,7 @@ import java.util.Map;
  * </p>
  *
  * @author QR-Attend Team — Member 3 (Backend & Integration Lead)
- * @version 1.0
+ * @version 1.1
  * @since 2026-03-27
  */
 public class SessionRepository {
@@ -67,7 +67,6 @@ public class SessionRepository {
         sessionsRef.document(sessionId)
                 .get()
                 .addOnSuccessListener(snapshot -> {
-                    // Optimized: toObject handles null check internally
                     callback.onSuccess(snapshot.toObject(AttendanceSession.class));
                 });
     }
@@ -90,7 +89,7 @@ public class SessionRepository {
                                 sessions.add(s);
                             }
                         }
-                        
+
                         if (sessions.isEmpty()) {
                             callback.onSuccess(null);
                             return;
@@ -112,23 +111,52 @@ public class SessionRepository {
     // ── Nonce / QR Update ───────────────────────────────────────────────
 
     /**
-     * Updates only the QR nonce in Firestore each refresh cycle.
+     * Updates the QR nonce in Firestore each refresh cycle.
+     *
+     * FIX (nonce grace window): Before overwriting {@code qrCode} with the
+     * new nonce, the CURRENT nonce is copied to {@code previousQrCode} with
+     * an expiry of {@code now + Constants.PREVIOUS_NONCE_GRACE_MS} (20s).
+     * This lets students who scanned the old QR but were delayed by GPS
+     * multi-sample collection (up to 14 seconds) still pass nonce validation.
+     *
      * The sessionKey is intentionally NOT rotated — it must remain stable
      * so that the student's scanner (initialized once at session discovery)
      * can always decrypt QR codes for the full session lifetime.
      */
-    public void updateSecureNonce(@NonNull String sessionId,
-                                  @NonNull String newNonce,
-                                  @NonNull String newSessionKey,
-                                  @NonNull OnCompleteListener<Void> callback) {
-        Map<String, Object> updates = new HashMap<>();
-        updates.put("qrCode", newNonce);
-        // sessionKey deliberately excluded — rotating it would break
-        // any scanner that was initialized before the rotation.
-
+    public void updateNonce(@NonNull String sessionId,
+                            @NonNull String newNonce,
+                            @NonNull String newSessionKey,
+                            @NonNull OnCompleteListener<Void> callback) {
+        // Step 1: Read the current nonce so we can preserve it as previousQrCode
         sessionsRef.document(sessionId)
-                .update(updates)
-                .addOnCompleteListener(callback);
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    Map<String, Object> updates = new HashMap<>();
+                    updates.put("qrCode", newNonce);
+
+                    // Preserve current nonce as previous with a grace window
+                    String currentNonce = snapshot.getString("qrCode");
+                    if (currentNonce != null && !currentNonce.isEmpty()) {
+                        updates.put("previousQrCode", currentNonce);
+                        updates.put("previousNonceExpiryMs",
+                                System.currentTimeMillis() + Constants.PREVIOUS_NONCE_GRACE_MS);
+                    }
+
+                    // sessionKey deliberately excluded — rotating it would break
+                    // any scanner that was initialized before the rotation.
+
+                    sessionsRef.document(sessionId)
+                            .update(updates)
+                            .addOnCompleteListener(callback);
+                })
+                .addOnFailureListener(e -> {
+                    // Fallback: write new nonce without preserving previous
+                    Map<String, Object> updates = new HashMap<>();
+                    updates.put("qrCode", newNonce);
+                    sessionsRef.document(sessionId)
+                            .update(updates)
+                            .addOnCompleteListener(callback);
+                });
     }
 
     // ── End Session ─────────────────────────────────────────────────────
@@ -167,7 +195,6 @@ public class SessionRepository {
                     callback.onCountChanged(count);
                 });
     }
-
 
     /**
      * Callback interface for real-time attendance count updates.
