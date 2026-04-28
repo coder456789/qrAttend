@@ -144,7 +144,60 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- ── Device Binding Card (students only — shown/hidden in code) ── -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardDeviceBinding"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:visibility="gone"
+                app:cardBackgroundColor="@color/surfaceContainerLowest"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="1dp"
+                app:strokeWidth="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-medium"
+                        android:text="@string/device_binding"
+                        android:textColor="@color/textPrimary"
+                        android:textSize="17sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="@string/unbind_device_subtitle"
+                        android:textColor="@color/textSecondary"
+                        android:textSize="13sp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnUnbindDevice"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginTop="16dp"
+                        android:fontFamily="sans-serif-medium"
+                        android:text="@string/unbind_device"
+                        android:textAllCaps="false"
+                        android:textColor="@color/error"
+                        android:textSize="14sp"
+                        app:cornerRadius="24dp"
+                        app:strokeColor="@color/error" />
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
             <!-- ── Preferences Card ── -->
+
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

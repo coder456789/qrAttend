@@ -20,12 +20,20 @@ public class AttendanceRecord {
     private String rejectionReason;
     private String studentId;
     private String sessionId;
-
     /**
-     * Empty constructor required by Firestore for deserialization.
+     * Human-readable subject / lecture name stored at write-time.
+     * Avoids a secondary Firestore lookup when showing the student's history.
      */
-    public AttendanceRecord() {
-    }
+    private String subject;
+
+    /** Student's full name — stored at write-time for the teacher's session view. */
+    private String studentName;
+
+    /** Student's PRN / roll number — stored at write-time for the teacher's session view. */
+    private String studentRollNo;
+
+    /** Empty constructor required by Firestore for deserialization. */
+    public AttendanceRecord() {}
 
     public AttendanceRecord(String status, Timestamp time, String deviceId,
                             GeoPoint location, String rejectionReason,
@@ -62,14 +70,22 @@ public class AttendanceRecord {
     public String getSessionId() { return sessionId; }
     public void setSessionId(String sessionId) { this.sessionId = sessionId; }
 
+    public String getSubject() { return subject; }
+    public void setSubject(String subject) { this.subject = subject; }
+
+    public String getStudentName() { return studentName; }
+    public void setStudentName(String studentName) { this.studentName = studentName; }
+
+    public String getStudentRollNo() { return studentRollNo; }
+    public void setStudentRollNo(String studentRollNo) { this.studentRollNo = studentRollNo; }
+
     @Override
     public String toString() {
         return "AttendanceRecord{" +
                 "status='" + status + '\'' +
                 ", time=" + time +
                 ", deviceId='" + deviceId + '\'' +
-                ", location=" + location +
-                ", rejectionReason='" + rejectionReason + '\'' +
+                ", subject='" + subject + '\'' +
                 ", studentId='" + studentId + '\'' +
                 ", sessionId='" + sessionId + '\'' +
                 '}';

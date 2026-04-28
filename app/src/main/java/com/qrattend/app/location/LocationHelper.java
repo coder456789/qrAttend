@@ -163,8 +163,9 @@ public class LocationHelper {
     // =======================================================================
 
     /**
-     * Collects up to 5 GPS samples over 12 seconds and returns ALL of them.
+     * Collects up to 2 GPS samples over 4 seconds and returns ALL of them.
      * ScanQRActivity uses these to find the one nearest to the teacher.
+     * Reduced from 5 samples/12s to 2 samples/4s to speed up QR scan validation.
      *
      * Also provides a single-location convenience via fetchCurrentLocation().
      *
@@ -182,11 +183,10 @@ public class LocationHelper {
                 LocationServices.getFusedLocationProviderClient(context);
 
         LocationRequest request = new LocationRequest.Builder(
-                Priority.PRIORITY_HIGH_ACCURACY, 2_000)
+                Priority.PRIORITY_HIGH_ACCURACY, 1_500)
                 .setMinUpdateIntervalMillis(1_000)
-                .setMaxUpdates(5)
-                .setDurationMillis(12_000L)
-                .setWaitForAccurateLocation(true)
+                .setMaxUpdates(2)           // Only 2 samples — fast!
+                .setDurationMillis(4_000L)  // Max 4 seconds
                 .build();
 
         final List<Location> allLocations = new ArrayList<>();
@@ -206,7 +206,7 @@ public class LocationHelper {
                     }
                 };
 
-        // After 14 seconds (12s + 2s grace), return all collected locations
+        // After 5 seconds (4s + 1s grace), return all collected locations
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             client.removeLocationUpdates(gmsCallback);
             if (!callbackFired[0]) {
@@ -219,10 +219,10 @@ public class LocationHelper {
                     callback.onFailure("timeout");
                 }
             }
-        }, 14_000L);
+        }, 5_000L);
 
         try {
-            // Also try to include the cached location
+            // Also try to include the cached location for instant response
             client.getLastLocation().addOnSuccessListener(location -> {
                 if (location != null && isFresh(location)) {
                     allLocations.add(location);

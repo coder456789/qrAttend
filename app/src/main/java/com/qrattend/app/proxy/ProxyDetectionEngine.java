@@ -165,13 +165,14 @@ public class ProxyDetectionEngine {
     }
 
     // -----------------------------------------------------------------------
-    // Layer 1b — 2-device binding check
+    // Layer 1b — Single-device binding check (MAX_DEVICES = 1)
     // -----------------------------------------------------------------------
 
     /**
-     * Checks current fingerprint against Student.deviceId and Student.deviceId2.
-     * PRD: Constants.MAX_DEVICES (2) per student.
-     * Uses Constants.REASON_DEVICE_MISMATCH on failure.
+     * Checks current fingerprint against Student.deviceId only.
+     * Each student account is bound to exactly one device at a time.
+     * If a different device is detected, the scan is rejected with
+     * Constants.REASON_DEVICE_MISMATCH.
      */
     private ValidationResult validateDevice(String currentFP,
                                             String deviceId,
@@ -183,16 +184,12 @@ public class ProxyDetectionEngine {
             return ValidationResult.pass();
         }
 
-        // Check primary device (Student.deviceId)
+        // Only one device slot is valid (single-device binding)
         if (currentFP.equals(deviceId)) {
             return ValidationResult.pass();
         }
 
-        // Check second device (Student.deviceId2) — empty string if unused
-        if (deviceId2 != null && !deviceId2.isEmpty() && currentFP.equals(deviceId2)) {
-            return ValidationResult.pass();
-        }
-
+        // Different device — reject
         return ValidationResult.fail(Constants.REASON_DEVICE_MISMATCH);
     }
 

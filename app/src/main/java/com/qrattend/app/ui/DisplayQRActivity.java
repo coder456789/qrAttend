@@ -166,6 +166,14 @@ public class DisplayQRActivity extends AppCompatActivity {
             refreshManager.stop();
         }
         sessionRepo.endSession(sessionId, task -> {
+            // Clear active-device lock so teacher can log in from other devices
+            String teacherId = getIntent().getStringExtra("teacher_id");
+            if (teacherId != null) {
+                java.util.Map<String, Object> unlock = new java.util.HashMap<>();
+                unlock.put("activeDeviceId", com.google.firebase.firestore.FieldValue.delete());
+                new com.qrattend.app.data.repository.TeacherRepository()
+                        .updateTeacher(teacherId, unlock, t -> { /* fire-and-forget */ });
+            }
             Toast.makeText(this, getString(R.string.session_ended), Toast.LENGTH_SHORT).show();
             finish();
         });

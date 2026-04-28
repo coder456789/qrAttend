@@ -1,9 +1,17 @@
 package com.qrattend.app.ui;
 
 import android.Manifest;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothManager;
+import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
+import android.location.LocationManager;
+import android.net.wifi.WifiManager;
+import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.View;
 import android.widget.ProgressBar;
@@ -45,6 +53,12 @@ public class ScanQRActivity extends AppCompatActivity {
             Manifest.permission.ACCESS_FINE_LOCATION
     };
 
+    /**
+     * Set to true when we send the user to a settings screen.
+     * onResume() will re-check connectivity and start the scan flow when set.
+     */
+    private boolean pendingStartAfterSettings = false;
+
     private PreviewView previewView;
     private TextView tvScanStatus;
     private ProgressBar progressScan;
@@ -76,7 +90,7 @@ public class ScanQRActivity extends AppCompatActivity {
         btnTryAgain.setOnClickListener(v -> requestPermissionsAndStart());
 
         if (hasAllPermissions()) {
-            startScanFlow();
+            showConnectivityDialog(this::startScanFlow);
         } else {
             ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, PERMISSION_REQUEST_CODE);
         }
@@ -104,7 +118,7 @@ public class ScanQRActivity extends AppCompatActivity {
                 }
             }
             if (allGranted) {
-                startScanFlow();
+                showConnectivityDialog(this::startScanFlow);
             } else {
                 tvScanStatus.setText(R.string.error_camera_permission);
             }
@@ -114,7 +128,7 @@ public class ScanQRActivity extends AppCompatActivity {
     private void requestPermissionsAndStart() {
         btnTryAgain.setVisibility(View.GONE);
         if (hasAllPermissions()) {
-            startScanFlow();
+            showConnectivityDialog(this::startScanFlow);
         } else {
             ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, PERMISSION_REQUEST_CODE);
         }
@@ -162,6 +176,102 @@ public class ScanQRActivity extends AppCompatActivity {
      * For now, we'll use a simpler approach: pass classId via intent if available,
      * or scan all active sessions.
      */
+    // ── Connectivity Helper ─────────────────────────────────────────────────
+
+    private BluetoothAdapter getBluetoothAdapter() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            BluetoothManager mgr = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+            return mgr != null ? mgr.getAdapter() : null;
+        }
+        return BluetoothAdapter.getDefaultAdapter();
+    }
+
+    private boolean isWifiOn() {
+        WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        return wm != null && wm.isWifiEnabled();
+    }
+
+    private boolean isLocationOn() {
+        LocationManager lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        return lm != null && (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)
+                || lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER));
+    }
+
+    private boolean isBluetoothOn() {
+        try {
+            BluetoothAdapter bt = getBluetoothAdapter();
+            return bt != null && bt.isEnabled();
+        } catch (SecurityException e) {
+            // BLUETOOTH_CONNECT permission not yet granted (Android 12+) — treat as off
+            Log.w(TAG, "isBluetoothOn: SecurityException — BLUETOOTH_CONNECT not granted yet");
+            return false;
+        }
+    }
+
+    /**
+     * Checks WiFi / Bluetooth / Location before opening the scanner.
+     * <p>
+     * All three services MUST be enabled to proceed.
+     * If any are off → shows a blocking modal:
+     *   "Please enable WiFi, Bluetooth, and Location to scan the QR code."
+     * The modal provides:
+     *   "Open Settings" → opens Android Settings so the user can enable services.
+     *   "Cancel"        → finishes the activity (no bypass allowed).
+     * When the user returns from Settings, onResume() re-checks and auto-proceeds.
+     */
+    private void showConnectivityDialog(Runnable onReady) {
+        if (isWifiOn() && isLocationOn() && isBluetoothOn()) {
+            onReady.run();
+            return;
+        }
+
+        // Store callback for re-check in onResume()
+        this.pendingOnReady = onReady;
+        pendingStartAfterSettings = true;
+
+        new AlertDialog.Builder(this)
+                .setTitle(getString(R.string.connectivity_required_title))
+                .setMessage(getString(R.string.connectivity_required_message))
+                .setCancelable(false)
+                .setPositiveButton(getString(R.string.connectivity_open_settings), (d, w) -> {
+                    // Open the main wireless settings page; user can toggle all three from there
+                    startActivity(new Intent(Settings.ACTION_WIRELESS_SETTINGS));
+                })
+                .setNegativeButton(getString(R.string.cancel), (d, w) -> {
+                    // User chose not to enable services — abort scanning
+                    finish();
+                })
+                .show();
+    }
+
+    // enableServicesSequentially is no longer used — kept as dead code removed below.
+
+
+
+    /** Stored callback used when we return from Location Settings. */
+    private Runnable pendingOnReady = null;
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (pendingStartAfterSettings && pendingOnReady != null) {
+            pendingStartAfterSettings = false;
+            if (isWifiOn() && isLocationOn() && isBluetoothOn()) {
+                // All services are now on — proceed with scan
+                Log.d(TAG, "onResume: all services on, starting scan flow");
+                Runnable callback = pendingOnReady;
+                pendingOnReady = null;
+                callback.run();
+            } else {
+                // One or more still off — re-show the mandatory dialog
+                Log.d(TAG, "onResume: services still off, re-showing dialog");
+                Runnable callback = pendingOnReady;
+                pendingOnReady = null;
+                showConnectivityDialog(callback);
+            }
+        }
+    }
+
     private void startScanFlow() {
         tvScanStatus.setText(R.string.scan_instruction);
         progressScan.setVisibility(View.VISIBLE);
@@ -174,16 +284,21 @@ public class ScanQRActivity extends AppCompatActivity {
             return;
         }
 
-        // Get student info first
+        // Get student info — proceed even if doc missing (stub will be created via registerDevice)
         studentRepo.getStudent(uid, student -> {
-            if (student == null) {
-                Log.e(TAG, "startScanFlow: student document not found for uid=" + uid);
-                progressScan.setVisibility(View.GONE);
-                tvScanStatus.setText("Student profile not found.\nMake sure you are registered.");
-                return;
+            Student effectiveStudent = student;
+            if (effectiveStudent == null) {
+                Log.w(TAG, "startScanFlow: student document not found for uid=" + uid
+                        + " — using stub. Student will be registered via registerDevice().");
+                // Build a minimal stub so the scan flow can continue.
+                // ProxyDetectionEngine doesn't require name/rollNo, only deviceId checks.
+                effectiveStudent = new Student();
+                effectiveStudent.setStudentId(uid);   // guard: set only if setter added — see below
             }
-            Log.d(TAG, "startScanFlow: student found — " + student.getName()
-                    + ", class=" + student.getClassName());
+            Log.d(TAG, "startScanFlow: student resolved — " + effectiveStudent.getName()
+                    + ", class=" + effectiveStudent.getClassName());
+
+            final Student finalStudent = effectiveStudent;
 
             // For the MVP, we check if there's a session ID passed via intent
             String intentSessionId = getIntent().getStringExtra("session_id");
@@ -194,7 +309,7 @@ public class ScanQRActivity extends AppCompatActivity {
                     if (session != null && session.getSessionKey() != null
                             && session.getSessionKey().length() >= 32) {
                         Log.d(TAG, "startScanFlow: intent session found, initializing scanner");
-                        initializeScanner(session, student, uid);
+                        initializeScanner(session, finalStudent, uid);
                     } else {
                         Log.w(TAG, "startScanFlow: intent session invalid or not found");
                         tvScanStatus.setText(R.string.error_session_not_found);
@@ -204,7 +319,7 @@ public class ScanQRActivity extends AppCompatActivity {
             } else {
                 // No session ID passed — try to find any active session
                 Log.d(TAG, "startScanFlow: no intent session, searching for active sessions...");
-                findActiveSessionAndScan(student, uid);
+                findActiveSessionAndScan(finalStudent, uid);
             }
         });
     }
@@ -344,6 +459,43 @@ public class ScanQRActivity extends AppCompatActivity {
                     btnTryAgain.setVisibility(View.VISIBLE);
                 });
             }
+        });
+
+        // ── Pinch-to-zoom on camera preview ─────────────────────────────
+        setupPinchToZoom();
+    }
+
+    /**
+     * Enables pinch-to-zoom on the PreviewView using a ScaleGestureDetector.
+     * The Camera reference from QRScannerUtil is used to adjust the zoom ratio.
+     */
+    private void setupPinchToZoom() {
+        android.view.ScaleGestureDetector scaleDetector = new android.view.ScaleGestureDetector(
+                this, new android.view.ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            @Override
+            public boolean onScale(android.view.ScaleGestureDetector detector) {
+                if (scanner == null || scanner.getCamera() == null) return false;
+
+                androidx.camera.core.Camera cam = scanner.getCamera();
+                float currentZoom = cam.getCameraInfo().getZoomState().getValue() != null
+                        ? cam.getCameraInfo().getZoomState().getValue().getZoomRatio() : 1f;
+                float newZoom = currentZoom * detector.getScaleFactor();
+
+                // Clamp within the camera's supported zoom range
+                float minZoom = cam.getCameraInfo().getZoomState().getValue() != null
+                        ? cam.getCameraInfo().getZoomState().getValue().getMinZoomRatio() : 1f;
+                float maxZoom = cam.getCameraInfo().getZoomState().getValue() != null
+                        ? cam.getCameraInfo().getZoomState().getValue().getMaxZoomRatio() : 1f;
+                newZoom = Math.max(minZoom, Math.min(newZoom, maxZoom));
+
+                cam.getCameraControl().setZoomRatio(newZoom);
+                return true;
+            }
+        });
+
+        previewView.setOnTouchListener((v, event) -> {
+            scaleDetector.onTouchEvent(event);
+            return true;
         });
     }
 
@@ -498,6 +650,8 @@ public class ScanQRActivity extends AppCompatActivity {
                             GeoPoint geoPoint = new GeoPoint(location.getLatitude(), location.getLongitude());
 
                             if (result.success) {
+                                String subjectName = freshSession.getSubject() != null
+                                        ? freshSession.getSubject() : "Unknown Subject";
                                 AttendanceRecord record = new AttendanceRecord(
                                         Constants.STATUS_PRESENT,
                                         Timestamp.now(),
@@ -507,6 +661,11 @@ public class ScanQRActivity extends AppCompatActivity {
                                         currentUid,
                                         payload.sessionId
                                 );
+                                record.setSubject(subjectName);
+                                if (freshStudent != null) {
+                                    record.setStudentName(freshStudent.getName());
+                                    record.setStudentRollNo(freshStudent.getRollNo());
+                                }
                                 attendanceRepo.markAttendance(payload.sessionId, currentUid, record, task -> {
                                     if (task.isSuccessful()) {
                                         showSuccessDialog(distance);
@@ -516,6 +675,8 @@ public class ScanQRActivity extends AppCompatActivity {
                                     }
                                 });
                             } else {
+                                String subjectName = freshSession.getSubject() != null
+                                        ? freshSession.getSubject() : "Unknown Subject";
                                 AttendanceRecord record = new AttendanceRecord(
                                         Constants.STATUS_REJECTED,
                                         Timestamp.now(),
@@ -525,6 +686,11 @@ public class ScanQRActivity extends AppCompatActivity {
                                         currentUid,
                                         payload.sessionId
                                 );
+                                record.setSubject(subjectName);
+                                if (freshStudent != null) {
+                                    record.setStudentName(freshStudent.getName());
+                                    record.setStudentRollNo(freshStudent.getRollNo());
+                                }
                                 attendanceRepo.markAttendance(payload.sessionId, currentUid, record, task -> {});
                                 showRejectionDialog(result.rejectionReason, distance, location);
                             }

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Exposes the app's external cache dir for sharing CSV files -->
+    <external-cache-path
+        name="csv_exports"
+        path="." />
+    <!-- Also expose internal cache as a fallback -->
+    <cache-path
+        name="csv_internal"
+        path="." />
+</paths>

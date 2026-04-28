@@ -1,9 +1,15 @@
 package com.qrattend.app.ui;
 
 import android.Manifest;
+import android.app.TimePickerDialog;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothManager;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
+import android.location.LocationManager;
+import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.ArrayAdapter;
@@ -35,7 +41,10 @@ import com.qrattend.app.security.AESCryptoUtil;
 import com.qrattend.app.utils.Constants;
 
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 public class StartSessionActivity extends AppCompatActivity {
 
@@ -43,9 +52,12 @@ public class StartSessionActivity extends AppCompatActivity {
 
     private Spinner spinnerClass, spinnerDuration;
     private TextView tvLocationLabel, tvLocationCoords;
+    private TextView tvLectureStart, tvLectureEnd;
     private MaterialButton btnGetLocation, btnStartSession, btnAddClass;
+    private MaterialButton btnPickStartTime, btnPickEndTime;
     private ProgressBar progressLocation, progressStartSession;
 
+    /** QR session duration options (minutes) — controls how long the QR is accepted */
     private static final int[] DURATION_MINUTES = {1, 2, 3, 4, 5};
 
     private AuthManager authManager;
@@ -53,13 +65,15 @@ public class StartSessionActivity extends AppCompatActivity {
     private SessionRepository sessionRepo;
 
     private List<ClassInfo> classesList = new ArrayList<>();
-    // FIX: store class document IDs alongside ClassInfo objects so we can pass
-    // the correct classId (doc ID) — not className — to AttendanceSession.
     private List<String> classDocIds = new ArrayList<>();
 
     private double latitude = 0, longitude = 0;
     private float locationAccuracy = Float.MAX_VALUE;
     private boolean locationSet = false;
+
+    /** Lecture start/end time selected by the teacher (optional). */
+    private Calendar lectureStartCal = null;
+    private Calendar lectureEndCal   = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -80,6 +94,12 @@ public class StartSessionActivity extends AppCompatActivity {
         btnAddClass          = findViewById(R.id.btnAddClass);
         spinnerDuration      = findViewById(R.id.spinnerDuration);
 
+        // Lecture time pickers (may be absent in older layout versions)
+        tvLectureStart  = findViewById(R.id.tvLectureStart);
+        tvLectureEnd    = findViewById(R.id.tvLectureEnd);
+        btnPickStartTime = findViewById(R.id.btnPickStartTime);
+        btnPickEndTime   = findViewById(R.id.btnPickEndTime);
+
         authManager = new AuthManager();
         classRepo   = new ClassRepository();
         sessionRepo = new SessionRepository();
@@ -87,25 +107,50 @@ public class StartSessionActivity extends AppCompatActivity {
         setupDurationSpinner();
 
         btnGetLocation.setOnClickListener(v -> fetchLocation());
-        btnStartSession.setOnClickListener(v -> startSession());
+        btnStartSession.setOnClickListener(v -> checkConnectivityThenStart());
         btnAddClass.setOnClickListener(v -> showAddClassDialog());
+
+        if (btnPickStartTime != null) {
+            btnPickStartTime.setOnClickListener(v -> showTimePicker(true));
+        }
+        if (btnPickEndTime != null) {
+            btnPickEndTime.setOnClickListener(v -> showTimePicker(false));
+        }
 
         loadClasses();
     }
 
     private void setupDurationSpinner() {
-        String[] labels = {
-                getString(R.string.duration_1_min),
-                getString(R.string.duration_2_min),
-                getString(R.string.duration_3_min),
-                getString(R.string.duration_4_min),
-                getString(R.string.duration_5_min)
-        };
+        String[] labels = {"1 minute", "2 minutes", "3 minutes", "4 minutes", "5 minutes"};
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
                 android.R.layout.simple_spinner_item, labels);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerDuration.setAdapter(adapter);
-        spinnerDuration.setSelection(1); // Default to 2 minutes
+        spinnerDuration.setSelection(1); // Default 2 minutes
+    }
+
+    private void showTimePicker(boolean isStart) {
+        Calendar cal = Calendar.getInstance();
+        int hour   = cal.get(Calendar.HOUR_OF_DAY);
+        int minute = cal.get(Calendar.MINUTE);
+
+        new TimePickerDialog(this, (view, h, m) -> {
+            Calendar selected = Calendar.getInstance();
+            selected.set(Calendar.HOUR_OF_DAY, h);
+            selected.set(Calendar.MINUTE, m);
+            selected.set(Calendar.SECOND, 0);
+
+            String label = String.format(Locale.getDefault(), "%02d:%02d %s",
+                    h > 12 ? h - 12 : (h == 0 ? 12 : h), m, h >= 12 ? "PM" : "AM");
+
+            if (isStart) {
+                lectureStartCal = selected;
+                if (tvLectureStart != null) tvLectureStart.setText("Start: " + label);
+            } else {
+                lectureEndCal = selected;
+                if (tvLectureEnd != null) tvLectureEnd.setText("End: " + label);
+            }
+        }, hour, minute, false).show();
     }
 
     private void loadClasses() {
@@ -119,9 +164,7 @@ public class StartSessionActivity extends AppCompatActivity {
 
             for (ClassInfo ci : classesList) {
                 names.add(ci.getSubject() + " — " + ci.getClassName());
-                // We'll store doc IDs after we retrieve them via a separate pass.
-                // For now populate with a placeholder; resolved properly in showAddClassDialog.
-                classDocIds.add(""); // placeholder — see note below
+                classDocIds.add(""); // placeholder
             }
 
             ArrayAdapter<String> spinnerAdapter = new ArrayAdapter<>(this,
@@ -130,6 +173,55 @@ public class StartSessionActivity extends AppCompatActivity {
             spinnerClass.setAdapter(spinnerAdapter);
         });
     }
+
+    // ── Connectivity Prerequisite Check (Teacher) ──────────────────────────
+
+    /**
+     * Called when the teacher taps "Start Session".
+     * Checks WiFi, Bluetooth, and Location before proceeding.
+     * If any are off → shows a mandatory blocking dialog.
+     */
+    private void checkConnectivityThenStart() {
+        if (isWifiOn() && isBluetoothOn() && isLocationOn()) {
+            startSession();
+            return;
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle(getString(R.string.connectivity_required_title))
+                .setMessage(getString(R.string.connectivity_required_message))
+                .setCancelable(false)
+                .setPositiveButton(getString(R.string.connectivity_open_settings), (d, w) -> {
+                    startActivity(new Intent(
+                            android.provider.Settings.ACTION_WIRELESS_SETTINGS));
+                })
+                .setNegativeButton(getString(R.string.cancel), (d, w) -> d.dismiss())
+                .show();
+    }
+
+    private boolean isWifiOn() {
+        WifiManager wm = (WifiManager) getApplicationContext()
+                .getSystemService(Context.WIFI_SERVICE);
+        return wm != null && wm.isWifiEnabled();
+    }
+
+    private boolean isBluetoothOn() {
+        try {
+            BluetoothManager mgr = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+            BluetoothAdapter bt = mgr != null ? mgr.getAdapter() : null;
+            return bt != null && bt.isEnabled();
+        } catch (SecurityException e) {
+            return false; // BLUETOOTH_CONNECT not granted yet (Android 12+)
+        }
+    }
+
+    private boolean isLocationOn() {
+        LocationManager lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        return lm != null && (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)
+                || lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER));
+    }
+
+    // ── Location Fetch ──────────────────────────────────────────────────────
 
     private void fetchLocation() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
@@ -142,8 +234,6 @@ public class StartSessionActivity extends AppCompatActivity {
         progressLocation.setVisibility(View.VISIBLE);
         btnGetLocation.setEnabled(false);
 
-        // Teacher uses quick fetch (1-2 samples max, ~5 seconds).
-        // Indoor accuracy will be low — that's fine for the anchor point.
         LocationHelper.fetchQuickLocation(this, new LocationHelper.LocationCallback() {
             @Override
             public void onSuccess(Location location) {
@@ -154,24 +244,18 @@ public class StartSessionActivity extends AppCompatActivity {
                     locationSet      = true;
                     tvLocationLabel.setText(R.string.get_my_location);
 
-                    // Show coordinates AND accuracy so the teacher knows if the GPS fix
-                    // is reliable. Indoor GPS can be 50–200m off — if accuracy is poor
-                    // the teacher should step near a window and retry.
                     String accuracyText = location.hasAccuracy()
-                            ? String.format(" (±%.0fm)", location.getAccuracy())
-                            : "";
+                            ? String.format(" (±%.0fm)", location.getAccuracy()) : "";
                     tvLocationCoords.setText(getString(R.string.location_fetched,
                             latitude, longitude) + accuracyText);
                     tvLocationCoords.setVisibility(View.VISIBLE);
                     progressLocation.setVisibility(View.GONE);
                     btnGetLocation.setEnabled(true);
 
-                    // Warn teacher if accuracy is worse than the geofence radius
-                    if (location.hasAccuracy()
-                            && location.getAccuracy() > Constants.DEFAULT_GEOFENCE_RADIUS) {
+                    if (location.hasAccuracy() && location.getAccuracy() > Constants.DEFAULT_GEOFENCE_RADIUS) {
                         Toast.makeText(StartSessionActivity.this,
                                 "⚠ GPS accuracy is ±" + String.format("%.0f", location.getAccuracy())
-                                        + "m — move near a window and tap again for a better fix.",
+                                        + "m — move near a window and tap again.",
                                 Toast.LENGTH_LONG).show();
                     }
                 });
@@ -210,8 +294,6 @@ public class StartSessionActivity extends AppCompatActivity {
             return;
         }
 
-        // Quality gate: block session start if teacher GPS accuracy is too poor.
-        // A bad anchor point means ALL students will be at wrong distances.
         if (locationAccuracy > Constants.TEACHER_MAX_ACCEPTABLE_ACCURACY) {
             new AlertDialog.Builder(this)
                     .setTitle("⚠ Poor GPS Accuracy")
@@ -231,44 +313,50 @@ public class StartSessionActivity extends AppCompatActivity {
         btnStartSession.setEnabled(false);
 
         try {
-            String sessionKey    = AESCryptoUtil.generateSessionKey();
+            String sessionKey      = AESCryptoUtil.generateSessionKey();
             int    durationMinutes = DURATION_MINUTES[spinnerDuration.getSelectedItemPosition()];
-
-            // FIX 1: classId should be the Firestore document ID of the class,
-            // not className. The original code had a broken ternary that always
-            // used className as classId. We use className as a stable stand-in
-            // for MVP (since ClassRepository.getClassesByTeacher doesn't return
-            // doc IDs directly via toObjects). This is consistent and won't null-out.
-            String classId = selectedClass.getClassName();
+            String classId         = selectedClass.getClassName();
 
             String sessionId = "session_" + classId.replaceAll("\\s+", "_")
                     + "_" + System.currentTimeMillis();
 
-            // FIX 2: AttendanceSession constructor now requires durationMinutes
-            // as a parameter (between startTime and endTime) after the fix to
-            // AttendanceSession.java. Passing it inline instead of via setDurationMinutes().
             AttendanceSession session = new AttendanceSession(
-                    classId,                           // classId
-                    selectedClass.getClassName(),       // className
-                    selectedClass.getSubject(),         // subject
-                    uid,                               // teacherId
-                    "",                                // qrCode (empty — set by QRRefreshManager)
-                    sessionKey,                        // sessionKey ← AES-256, 44 chars
-                    latitude,                          // latitude
-                    longitude,                         // longitude
-                    Constants.DEFAULT_GEOFENCE_RADIUS, // geofenceRadius
-                    Timestamp.now(),                   // startTime
-                    durationMinutes,                   // FIX: durationMinutes now in constructor
-                    null,                              // endTime
-                    true                               // active
+                    classId,
+                    selectedClass.getClassName(),
+                    selectedClass.getSubject(),
+                    uid,
+                    "",
+                    sessionKey,
+                    latitude,
+                    longitude,
+                    Constants.DEFAULT_GEOFENCE_RADIUS,
+                    Timestamp.now(),
+                    durationMinutes,
+                    null,
+                    true
             );
-            // No longer needed: session.setDurationMinutes(durationMinutes);
+
+            // Store optional lecture start/end times
+            if (lectureStartCal != null) {
+                session.setLectureStartTime(new Timestamp(new Date(lectureStartCal.getTimeInMillis())));
+            }
+            if (lectureEndCal != null) {
+                session.setLectureEndTime(new Timestamp(new Date(lectureEndCal.getTimeInMillis())));
+            }
 
             sessionRepo.createSession(sessionId, session, task -> {
                 progressStartSession.setVisibility(View.GONE);
                 btnStartSession.setEnabled(true);
 
                 if (task.isSuccessful()) {
+                    // Lock this device as the active session device
+                    String thisDeviceId = com.qrattend.app.security.DeviceFingerprint
+                            .getFingerprint(StartSessionActivity.this);
+                    java.util.Map<String, Object> lockUpdate = new java.util.HashMap<>();
+                    lockUpdate.put("activeDeviceId", thisDeviceId);
+                    new com.qrattend.app.data.repository.TeacherRepository()
+                            .updateTeacher(uid, lockUpdate, t -> { /* fire-and-forget */ });
+
                     Intent intent = new Intent(this, DisplayQRActivity.class);
                     intent.putExtra("session_id",       sessionId);
                     intent.putExtra("session_key",      sessionKey);

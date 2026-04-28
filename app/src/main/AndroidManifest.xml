@@ -12,6 +12,31 @@
     <!-- Camera needed for QR scanning -->
     <uses-permission android:name="android.permission.CAMERA" />
 
+    <!-- Bluetooth — legacy (pre-Android 12) -->
+    <uses-permission android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
+
+    <!-- Bluetooth — Android 12+ (API 31+) -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="s" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"
+        tools:targetApi="s" />
+
+    <!-- WiFi state checks -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+
+    <!-- Storage — for writing CSV export files (Android < 10) -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
     <!-- Background location is NOT needed as attendance is only marked in foreground -->
 
     <application
@@ -49,6 +74,8 @@
         <activity android:name=".ui.ScanQRActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
+        <activity android:name=".ui.SubjectAttendanceActivity"
+            android:exported="false" />
 
         <!-- Teacher -->
         <activity android:name=".ui.TeacherDashboardActivity"
@@ -61,7 +88,8 @@
             android:keepScreenOn="true" />
         <activity android:name=".ui.SessionAttendanceActivity"
             android:exported="false" />
-
+        <activity android:name=".ui.ClassSessionsActivity"
+            android:exported="false" />
 
 
         <!-- Shared -->
@@ -81,6 +109,17 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+
+        <!-- FileProvider — for sharing CSV exports via content:// URIs -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.qrattend.app.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
     </application>
 

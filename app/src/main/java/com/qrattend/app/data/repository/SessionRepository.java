@@ -107,12 +107,66 @@ public class SessionRepository {
                     }
                 });
     }
+    /**
+     * Retrieves all sessions (active or ended) created by a specific teacher,
+     * ordered by start time descending (newest first).
+     * Used by the teacher dashboard to list historical sessions.
+     */
+    public void getAllSessionsByTeacher(@NonNull String teacherId,
+                                       @NonNull OnSuccessListener<List<AttendanceSession>> callback) {
+        sessionsRef
+                .whereEqualTo("teacherId", teacherId)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    List<AttendanceSession> sessions = new java.util.ArrayList<>();
+                    for (com.google.firebase.firestore.DocumentSnapshot doc
+                            : querySnapshot.getDocuments()) {
+                        AttendanceSession s = doc.toObject(AttendanceSession.class);
+                        if (s != null) sessions.add(s);
+                    }
+                    // Sort newest-first without needing a Firestore composite index
+                    sessions.sort((a, b) -> {
+                        if (a.getStartTime() == null) return 1;
+                        if (b.getStartTime() == null) return -1;
+                        return b.getStartTime().compareTo(a.getStartTime());
+                    });
+                    callback.onSuccess(sessions);
+                })
+                .addOnFailureListener(e -> callback.onSuccess(new java.util.ArrayList<>()));
+    }
+
+    /**
+     * Retrieves all sessions for a specific class (by classId + teacherId),
+     * sorted oldest-first (for chronological CSV columns).
+     */
+    public void getSessionsByClass(@NonNull String classId,
+                                   @NonNull String teacherId,
+                                   @NonNull OnSuccessListener<List<AttendanceSession>> callback) {
+        sessionsRef
+                .whereEqualTo("classId", classId)
+                .whereEqualTo("teacherId", teacherId)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    List<AttendanceSession> sessions = new java.util.ArrayList<>();
+                    for (com.google.firebase.firestore.DocumentSnapshot doc
+                            : querySnapshot.getDocuments()) {
+                        AttendanceSession s = doc.toObject(AttendanceSession.class);
+                        if (s != null) sessions.add(s);
+                    }
+                    // Sort oldest-first for chronological CSV columns
+                    sessions.sort((a, b) -> {
+                        if (a.getStartTime() == null) return 1;
+                        if (b.getStartTime() == null) return -1;
+                        return a.getStartTime().compareTo(b.getStartTime());
+                    });
+                    callback.onSuccess(sessions);
+                })
+                .addOnFailureListener(e -> callback.onSuccess(new java.util.ArrayList<>()));
+    }
 
     // ── Nonce / QR Update ───────────────────────────────────────────────
 
     /**
-     * Updates the QR nonce in Firestore each refresh cycle.
-     *
      * FIX (nonce grace window): Before overwriting {@code qrCode} with the
      * new nonce, the CURRENT nonce is copied to {@code previousQrCode} with
      * an expiry of {@code now + Constants.PREVIOUS_NONCE_GRACE_MS} (20s).
