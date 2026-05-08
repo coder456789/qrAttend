@@ -177,8 +177,13 @@ public class ScanQRActivity extends AppCompatActivity {
     // ── Connectivity Helper ─────────────────────────────────────────────────
 
     private boolean isWifiOn() {
-        WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-        return wm != null && wm.isWifiEnabled();
+        try {
+            WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+            return wm != null && wm.isWifiEnabled();
+        } catch (SecurityException e) {
+            Log.w(TAG, "isWifiOn: ACCESS_WIFI_STATE not granted — assuming on");
+            return true; // assume connected; Firebase will fail gracefully if not
+        }
     }
 
     private boolean isLocationOn() {
