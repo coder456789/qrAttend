@@ -253,10 +253,9 @@ public class StartSessionActivity extends AppCompatActivity {
                     btnGetLocation.setEnabled(true);
 
                     if (location.hasAccuracy() && location.getAccuracy() > Constants.DEFAULT_GEOFENCE_RADIUS) {
-                        Toast.makeText(StartSessionActivity.this,
-                                "⚠ GPS accuracy is ±" + String.format("%.0f", location.getAccuracy())
-                                        + "m — move near a window and tap again.",
-                                Toast.LENGTH_LONG).show();
+                        com.qrattend.app.utils.SnackbarHelper.warning(StartSessionActivity.this,
+                                "GPS accuracy is ±" + String.format("%.0f", location.getAccuracy())
+                                        + "m — move near a window and tap again.");
                     }
                 });
             }
@@ -266,8 +265,8 @@ public class StartSessionActivity extends AppCompatActivity {
                 runOnUiThread(() -> {
                     progressLocation.setVisibility(View.GONE);
                     btnGetLocation.setEnabled(true);
-                    Toast.makeText(StartSessionActivity.this,
-                            getString(R.string.error_location_unavailable), Toast.LENGTH_SHORT).show();
+                    com.qrattend.app.utils.SnackbarHelper.error(StartSessionActivity.this,
+                            getString(R.string.error_location_unavailable));
                 });
             }
         });
@@ -285,12 +284,12 @@ public class StartSessionActivity extends AppCompatActivity {
 
     private void startSession() {
         if (classesList.isEmpty() || spinnerClass.getSelectedItemPosition() < 0) {
-            Toast.makeText(this, getString(R.string.error_select_class), Toast.LENGTH_SHORT).show();
+            com.qrattend.app.utils.SnackbarHelper.warning(this, getString(R.string.error_select_class));
             return;
         }
 
         if (!locationSet) {
-            Toast.makeText(this, getString(R.string.error_get_location), Toast.LENGTH_SHORT).show();
+            com.qrattend.app.utils.SnackbarHelper.warning(this, getString(R.string.error_get_location));
             return;
         }
 
@@ -368,14 +367,13 @@ public class StartSessionActivity extends AppCompatActivity {
                     startActivity(intent);
                     finish();
                 } else {
-                    Toast.makeText(this, getString(R.string.error_start_session),
-                            Toast.LENGTH_LONG).show();
+                    com.qrattend.app.utils.SnackbarHelper.error(this, getString(R.string.error_start_session));
                 }
             });
         } catch (Exception e) {
             progressStartSession.setVisibility(View.GONE);
             btnStartSession.setEnabled(true);
-            Toast.makeText(this, getString(R.string.error_start_session), Toast.LENGTH_LONG).show();
+            com.qrattend.app.utils.SnackbarHelper.error(this, getString(R.string.error_start_session));
         }
     }
 
@@ -425,7 +423,7 @@ public class StartSessionActivity extends AppCompatActivity {
                         if (task.isSuccessful()) {
                             // Show the join code to the teacher
                             new AlertDialog.Builder(this)
-                                    .setTitle("Class Created! 🎉")
+                                    .setTitle("Class Created")
                                     .setMessage("Share this code with your students so they can join:\n\n"
                                             + "📋  " + joinCode + "\n\n"
                                             + "Class: " + subject + " — " + className)
@@ -435,14 +433,14 @@ public class StartSessionActivity extends AppCompatActivity {
                                         android.content.ClipData clip =
                                                 android.content.ClipData.newPlainText("Join Code", joinCode);
                                         clipboard.setPrimaryClip(clip);
-                                        Toast.makeText(this, "Code copied: " + joinCode, Toast.LENGTH_SHORT).show();
+                                        com.qrattend.app.utils.SnackbarHelper.info(this, "Code copied: " + joinCode);
                                         loadClasses();
                                     })
                                     .setNegativeButton("Close", (d, w) -> loadClasses())
                                     .setCancelable(false)
                                     .show();
                         } else {
-                            Toast.makeText(this, getString(R.string.error_create_class), Toast.LENGTH_SHORT).show();
+                            com.qrattend.app.utils.SnackbarHelper.error(this, getString(R.string.error_create_class));
                         }
                     });
                 })

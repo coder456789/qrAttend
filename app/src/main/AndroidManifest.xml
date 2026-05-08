@@ -49,6 +49,16 @@
         <activity android:name=".ui.ScanQRActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
+        <activity android:name=".ui.SubjectAttendanceActivity"
+            android:exported="false" />
+        <activity android:name=".ui.JoinClassActivity"
+            android:exported="false" />
+        <activity android:name=".ui.TimetableActivity"
+            android:exported="false" />
+        <activity android:name=".ui.LeaveApplicationActivity"
+            android:exported="false" />
+        <activity android:name=".ui.MyLeavesActivity"
+            android:exported="false" />
 
         <!-- Teacher -->
         <activity android:name=".ui.TeacherDashboardActivity"
@@ -61,8 +71,10 @@
             android:keepScreenOn="true" />
         <activity android:name=".ui.SessionAttendanceActivity"
             android:exported="false" />
-
-
+        <activity android:name=".ui.ClassSessionsActivity"
+            android:exported="false" />
+        <activity android:name=".ui.LeaveApplicationsActivity"
+            android:exported="false" />
 
         <!-- Shared -->
         <activity android:name=".ui.SettingsActivity"
@@ -81,6 +93,16 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.qrattend.app.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
     </application>
 

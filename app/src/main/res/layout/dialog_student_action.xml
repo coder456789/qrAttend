@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Custom dialog for teacher long-press actions on a student attendance record -->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/bg_rounded_dialog"
+    android:paddingBottom="12dp">
+
+    <!-- Header: student name -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp"
+        android:background="@drawable/bg_gradient_header">
+
+        <TextView
+            android:id="@+id/tvDialogStudentName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/white"
+            android:textSize="17sp"
+            android:fontFamily="sans-serif-medium"
+            android:textStyle="bold"
+            android:text="Student Name" />
+
+        <TextView
+            android:id="@+id/tvDialogStudentRoll"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#CCFFFFFF"
+            android:textSize="13sp"
+            android:layout_marginTop="2dp" />
+
+    </LinearLayout>
+
+    <!-- Action buttons -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:gravity="center">
+
+        <!-- Mark Present -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnMarkPresent"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="4dp"
+            android:text="✅ Present"
+            android:textSize="13sp"
+            app:backgroundTint="@color/attendanceHigh"
+            app:cornerRadius="12dp" />
+
+        <!-- Mark Absent -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnMarkAbsent"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp"
+            android:text="❌ Absent"
+            android:textSize="13sp"
+            app:backgroundTint="@color/attendanceLow"
+            app:cornerRadius="12dp" />
+
+        <!-- Mark Leave -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnMarkLeave"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:text="📋 Leave"
+            android:textSize="13sp"
+            app:backgroundTint="@color/attendanceMid"
+            app:cornerRadius="12dp" />
+
+    </LinearLayout>
+
+    <!-- Unbind device — full-width danger button -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnUnbindDevice"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="4dp"
+        android:text="🔓 Unbind Device"
+        android:textSize="13sp"
+        style="@style/Widget.Material3.Button.OutlinedButton"
+        app:cornerRadius="12dp" />
+
+    <!-- Cancel -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnDialogCancel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:text="Cancel"
+        android:textSize="13sp"
+        style="@style/Widget.Material3.Button.TextButton"
+        app:cornerRadius="12dp" />
+
+</LinearLayout>

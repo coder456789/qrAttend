@@ -73,6 +73,16 @@
                 android:fontFamily="sans-serif-medium"
                 android:textSize="12sp" />
 
+            <TextView
+                android:id="@+id/tvAttachBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="📎 Attachment"
+                android:textColor="@color/primary"
+                android:textSize="10sp"
+                android:visibility="gone" />
+
             <ImageView
                 android:layout_width="20dp"
                 android:layout_height="20dp"

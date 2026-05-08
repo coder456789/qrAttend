@@ -15,7 +15,7 @@ import java.util.List;
 
 /**
  * Adapter for the teacher dashboard's "My Classes" section.
- * Shows one row per unique class (subject + className), with session count.
+ * Shows one row per unique class (subject + className), with session count and join code.
  */
 public class ClassGroupAdapter extends RecyclerView.Adapter<ClassGroupAdapter.ViewHolder> {
 
@@ -24,6 +24,7 @@ public class ClassGroupAdapter extends RecyclerView.Adapter<ClassGroupAdapter.Vi
         public String classId;    // Firestore classId (= className for MVP)
         public String className;  // e.g. "SY IT"
         public String subject;    // e.g. "OOP"
+        public String joinCode;   // 6-char code displayed on the card
         public int sessionCount;  // total sessions taken for this class
         public int activeCount;   // currently active sessions
     }
@@ -64,6 +65,16 @@ public class ClassGroupAdapter extends RecyclerView.Adapter<ClassGroupAdapter.Vi
         }
         holder.tvSessionCount.setText(countLabel);
 
+        // Show join code chip if available
+        if (holder.tvJoinCode != null) {
+            if (g.joinCode != null && !g.joinCode.isEmpty()) {
+                holder.tvJoinCode.setText("Code: " + g.joinCode);
+                holder.tvJoinCode.setVisibility(View.VISIBLE);
+            } else {
+                holder.tvJoinCode.setVisibility(View.GONE);
+            }
+        }
+
         holder.itemView.setOnClickListener(v -> {
             if (listener != null) listener.onClassGroupClick(g);
         });
@@ -77,11 +88,13 @@ public class ClassGroupAdapter extends RecyclerView.Adapter<ClassGroupAdapter.Vi
     static class ViewHolder extends RecyclerView.ViewHolder {
         final TextView tvSubjectClass;
         final TextView tvSessionCount;
+        final TextView tvJoinCode;
 
         ViewHolder(@NonNull View itemView) {
             super(itemView);
             tvSubjectClass = itemView.findViewById(R.id.tvClassGroupSubject);
             tvSessionCount = itemView.findViewById(R.id.tvClassGroupCount);
+            tvJoinCode     = itemView.findViewById(R.id.tvClassGroupJoinCode);
         }
     }
 }

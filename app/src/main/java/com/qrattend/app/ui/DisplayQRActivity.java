@@ -59,7 +59,7 @@ public class DisplayQRActivity extends AppCompatActivity {
         double lng       = getIntent().getDoubleExtra("longitude", 0);
 
         if (sessionId == null || sessionKey == null) {
-            Toast.makeText(this, getString(R.string.error_generic), Toast.LENGTH_LONG).show();
+            com.qrattend.app.utils.SnackbarHelper.error(this, getString(R.string.error_generic));
             finish();
             return;
         }
@@ -89,8 +89,8 @@ public class DisplayQRActivity extends AppCompatActivity {
             @Override
             public void onError(String reason) {
                 runOnUiThread(() ->
-                        Toast.makeText(DisplayQRActivity.this,
-                                getString(R.string.error_qr_generation), Toast.LENGTH_SHORT).show());
+                        com.qrattend.app.utils.SnackbarHelper.error(DisplayQRActivity.this,
+                                getString(R.string.error_qr_generation)));
             }
         });
 
@@ -174,7 +174,30 @@ public class DisplayQRActivity extends AppCompatActivity {
                 new com.qrattend.app.data.repository.TeacherRepository()
                         .updateTeacher(teacherId, unlock, t -> { /* fire-and-forget */ });
             }
-            Toast.makeText(this, getString(R.string.session_ended), Toast.LENGTH_SHORT).show();
+
+            // Auto-mark absent: find class doc and write Absent for non-scanners
+            String courseId  = getIntent().getStringExtra("course_id");
+            if (teacherId != null && courseId != null) {
+                com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                        .collection(com.qrattend.app.utils.Constants.CLASSES)
+                        .whereEqualTo("className",  courseId)
+                        .whereEqualTo("teacherId",  teacherId)
+                        .limit(1)
+                        .get()
+                        .addOnSuccessListener(qs -> {
+                            if (qs != null && !qs.isEmpty()) {
+                                String classDocId = qs.getDocuments().get(0).getId();
+                                // Get the subject from the session for the record
+                                sessionRepo.getSession(sessionId, session -> {
+                                    String subject = session != null ? session.getSubject() : null;
+                                    new com.qrattend.app.data.repository.AttendanceRepository()
+                                            .markAbsentForMissing(sessionId, classDocId, subject);
+                                });
+                            }
+                        });
+            }
+
+            com.qrattend.app.utils.SnackbarHelper.info(this, getString(R.string.session_ended));
             finish();
         });
     }

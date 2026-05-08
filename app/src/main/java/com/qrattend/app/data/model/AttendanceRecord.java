@@ -20,6 +20,9 @@ public class AttendanceRecord {
     private String rejectionReason;
     private String studentId;
     private String sessionId;
+    private String studentName;
+    private String studentRollNo;
+    private String subject;
 
     /**
      * Empty constructor required by Firestore for deserialization.
@@ -37,6 +40,22 @@ public class AttendanceRecord {
         this.rejectionReason = rejectionReason;
         this.studentId = studentId;
         this.sessionId = sessionId;
+    }
+
+    public AttendanceRecord(String status, Timestamp time, String deviceId,
+                            GeoPoint location, String rejectionReason,
+                            String studentId, String sessionId,
+                            String studentName, String studentRollNo, String subject) {
+        this.status = status;
+        this.time = time;
+        this.deviceId = deviceId;
+        this.location = location;
+        this.rejectionReason = rejectionReason;
+        this.studentId = studentId;
+        this.sessionId = sessionId;
+        this.studentName = studentName;
+        this.studentRollNo = studentRollNo;
+        this.subject = subject;
     }
 
     // ── Getters and Setters ─────────────────────────────────────────────
@@ -62,6 +81,15 @@ public class AttendanceRecord {
     public String getSessionId() { return sessionId; }
     public void setSessionId(String sessionId) { this.sessionId = sessionId; }
 
+    public String getStudentName() { return studentName; }
+    public void setStudentName(String studentName) { this.studentName = studentName; }
+
+    public String getStudentRollNo() { return studentRollNo; }
+    public void setStudentRollNo(String studentRollNo) { this.studentRollNo = studentRollNo; }
+
+    public String getSubject() { return subject; }
+    public void setSubject(String subject) { this.subject = subject; }
+
     @Override
     public String toString() {
         return "AttendanceRecord{" +
@@ -72,6 +100,9 @@ public class AttendanceRecord {
                 ", rejectionReason='" + rejectionReason + '\'' +
                 ", studentId='" + studentId + '\'' +
                 ", sessionId='" + sessionId + '\'' +
+                ", studentName='" + studentName + '\'' +
+                ", studentRollNo='" + studentRollNo + '\'' +
+                ", subject='" + subject + '\'' +
                 '}';
     }
 }

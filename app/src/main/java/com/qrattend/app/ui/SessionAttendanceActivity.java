@@ -212,46 +212,57 @@ public class SessionAttendanceActivity extends AppCompatActivity {
         String studentId = record.getStudentId();
         if (studentId == null || sessionId == null) return;
 
-        String studentDisplay = (record.getStudentName() != null && !record.getStudentName().isEmpty())
-                ? record.getStudentName() + " (" + record.getStudentRollNo() + ")"
-                : studentId;
+        String name = (record.getStudentName() != null && !record.getStudentName().isEmpty())
+                ? record.getStudentName() : "Student";
+        String roll = record.getStudentRollNo() != null
+                ? "PRN: " + record.getStudentRollNo() : "";
 
-        String[] options = {"Mark Present", "Mark Absent", "Mark Leave", "Unbind Device"};
+        // Inflate custom layout
+        android.view.View dialogView = android.view.LayoutInflater.from(this)
+                .inflate(R.layout.dialog_student_action, null);
 
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle(studentDisplay)
-                .setItems(options, (dialog, which) -> {
-                    switch (which) {
-                        case 0: // Mark Present
-                            markWithStatus(sessionId, studentId,
-                                    "Present",
-                                    record.getStudentName(),
-                                    record.getStudentRollNo(),
-                                    null);
-                            break;
-                        case 1: // Mark Absent
-                            markWithStatus(sessionId, studentId,
-                                    com.qrattend.app.utils.Constants.STATUS_ABSENT,
-                                    record.getStudentName(),
-                                    record.getStudentRollNo(),
-                                    null);
-                            break;
-                        case 2: // Mark Leave
-                            markWithStatus(sessionId, studentId,
-                                    com.qrattend.app.utils.Constants.STATUS_LEAVE,
-                                    record.getStudentName(),
-                                    record.getStudentRollNo(),
-                                    null);
-                            break;
-                        case 3: // Unbind Device
-                            confirmAndUnbindDevice(studentId,
-                                    record.getStudentName() != null
-                                            ? record.getStudentName() : "Student");
-                            break;
-                    }
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
+        android.widget.TextView tvName = dialogView.findViewById(R.id.tvDialogStudentName);
+        android.widget.TextView tvRoll = dialogView.findViewById(R.id.tvDialogStudentRoll);
+        tvName.setText(name);
+        tvRoll.setText(roll);
+
+        androidx.appcompat.app.AlertDialog dialog =
+                new androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setView(dialogView)
+                        .create();
+
+        // Transparent window background so the rounded card shape shows
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(
+                    new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+        }
+
+        String subject = null; // subject resolved per-action if needed
+
+        dialogView.findViewById(R.id.btnMarkPresent).setOnClickListener(v -> {
+            markWithStatus(sessionId, studentId, "Present",
+                    record.getStudentName(), record.getStudentRollNo(), subject);
+            dialog.dismiss();
+        });
+        dialogView.findViewById(R.id.btnMarkAbsent).setOnClickListener(v -> {
+            markWithStatus(sessionId, studentId,
+                    com.qrattend.app.utils.Constants.STATUS_ABSENT,
+                    record.getStudentName(), record.getStudentRollNo(), subject);
+            dialog.dismiss();
+        });
+        dialogView.findViewById(R.id.btnMarkLeave).setOnClickListener(v -> {
+            markWithStatus(sessionId, studentId,
+                    com.qrattend.app.utils.Constants.STATUS_LEAVE,
+                    record.getStudentName(), record.getStudentRollNo(), subject);
+            dialog.dismiss();
+        });
+        dialogView.findViewById(R.id.btnUnbindDevice).setOnClickListener(v -> {
+            dialog.dismiss();
+            confirmAndUnbindDevice(studentId, name);
+        });
+        dialogView.findViewById(R.id.btnDialogCancel).setOnClickListener(v -> dialog.dismiss());
+
+        dialog.show();
     }
 
     private void markWithStatus(String sid, String studentId, String status,
@@ -259,11 +270,11 @@ public class SessionAttendanceActivity extends AppCompatActivity {
         attendanceRepo.manuallyMarkWithStatus(sid, studentId, status, name, rollNo, subject,
                 task -> runOnUiThread(() -> {
                     if (task.isSuccessful()) {
-                        Toast.makeText(this,
-                                name + " marked " + status + ".",
-                                Toast.LENGTH_SHORT).show();
+                        com.qrattend.app.utils.SnackbarHelper.success(this,
+                                name + " marked " + status + ".");
                     } else {
-                        Toast.makeText(this, "Failed to update status.", Toast.LENGTH_LONG).show();
+                        com.qrattend.app.utils.SnackbarHelper.error(this,
+                                "Failed to update status.");
                     }
                 }));
     }
@@ -277,12 +288,11 @@ public class SessionAttendanceActivity extends AppCompatActivity {
                         studentRepo.unbindDeviceByTeacher(studentId, task ->
                                 runOnUiThread(() -> {
                                     if (task.isSuccessful()) {
-                                        Toast.makeText(this,
-                                                "Device unbound for " + studentName + ".",
-                                                Toast.LENGTH_SHORT).show();
+                                        com.qrattend.app.utils.SnackbarHelper.success(this,
+                                                "Device unbound for " + studentName + ".");
                                     } else {
-                                        Toast.makeText(this, "Failed to unbind device.",
-                                                Toast.LENGTH_LONG).show();
+                                        com.qrattend.app.utils.SnackbarHelper.error(this,
+                                                "Failed to unbind device.");
                                     }
                                 })))
                 .setNegativeButton("Cancel", null)
@@ -328,7 +338,7 @@ public class SessionAttendanceActivity extends AppCompatActivity {
                 .setPositiveButton("Submit", (dialog, which) -> {
                     String prn = etPrn.getText().toString().trim();
                     if (prn.isEmpty()) {
-                        Toast.makeText(this, "PRN cannot be empty.", Toast.LENGTH_SHORT).show();
+                        com.qrattend.app.utils.SnackbarHelper.warning(this, "PRN cannot be empty.");
                         return;
                     }
                     String status = rbAbsent.isChecked()
@@ -350,7 +360,8 @@ public class SessionAttendanceActivity extends AppCompatActivity {
                 progressBar.setVisibility(View.GONE);
 
                 if (result == null) {
-                    Toast.makeText(this, "No student found with PRN: " + prn, Toast.LENGTH_LONG).show();
+                    com.qrattend.app.utils.SnackbarHelper.error(this,
+                            "No student found with PRN: " + prn);
                     return;
                 }
 
@@ -366,12 +377,11 @@ public class SessionAttendanceActivity extends AppCompatActivity {
                             sessionId, uid, status, name, rollNo, subject,
                             task -> runOnUiThread(() -> {
                                 if (task.isSuccessful()) {
-                                    Toast.makeText(this,
-                                            name + " (" + rollNo + ") marked " + status + ".",
-                                            Toast.LENGTH_SHORT).show();
+                                    com.qrattend.app.utils.SnackbarHelper.success(this,
+                                            name + " (" + rollNo + ") marked " + status + ".");
                                 } else {
-                                    Toast.makeText(this, "Failed to mark attendance.",
-                                            Toast.LENGTH_LONG).show();
+                                    com.qrattend.app.utils.SnackbarHelper.error(this,
+                                            "Failed to mark attendance.");
                                 }
                             }));
                 });

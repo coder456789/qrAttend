@@ -32,6 +32,7 @@ public class StudentDashboardActivity extends AppCompatActivity {
 
     private TextView             tvAttendancePercent, tvEmptySubjects;
     private ProgressBar          progressAttendance;
+    private AttendanceDonutView  donutChart;
     private RecyclerView         rvSubjects;
     private ExtendedFloatingActionButton fabScanQR;
     private SubjectGroupAdapter  adapter;
@@ -51,6 +52,7 @@ public class StudentDashboardActivity extends AppCompatActivity {
         tvAttendancePercent = findViewById(R.id.tvAttendancePercent);
         tvEmptySubjects     = findViewById(R.id.tvEmptySubjects);
         progressAttendance  = findViewById(R.id.progressAttendance);
+        donutChart          = findViewById(R.id.donutChart);
         rvSubjects          = findViewById(R.id.rvSubjects);
         fabScanQR           = findViewById(R.id.fabScanQR);
 
@@ -116,6 +118,7 @@ public class StudentDashboardActivity extends AppCompatActivity {
                     tvAttendancePercent.setTextColor(
                             ContextCompat.getColor(this, R.color.attendanceLow));
                     progressAttendance.setProgress(0);
+                    if (donutChart != null) donutChart.setPercent(0);
                     tvEmptySubjects.setVisibility(View.VISIBLE);
                     rvSubjects.setVisibility(View.GONE);
                     return;
@@ -128,10 +131,14 @@ public class StudentDashboardActivity extends AppCompatActivity {
 
                 tvAttendancePercent.setText(getString(R.string.attendance_percentage, pct));
                 progressAttendance.setProgress(pct);
+                if (donutChart != null) donutChart.setPercent(pct);
                 int overallColor = pct >= 75 ? R.color.attendanceHigh
                         : pct >= 60 ? R.color.attendanceMid : R.color.attendanceLow;
                 tvAttendancePercent.setTextColor(
                         ContextCompat.getColor(this, overallColor));
+                progressAttendance.setProgressTintList(
+                        android.content.res.ColorStateList.valueOf(
+                                ContextCompat.getColor(this, overallColor)));
 
                 // ── Group by subject ──────────────────────────────────────
                 // LinkedHashMap preserves insertion order for deterministic ordering

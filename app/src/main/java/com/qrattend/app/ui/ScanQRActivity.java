@@ -668,6 +668,8 @@ public class ScanQRActivity extends AppCompatActivity {
                                 }
                                 attendanceRepo.markAttendance(payload.sessionId, currentUid, record, task -> {
                                     if (task.isSuccessful()) {
+                                        // Auto-enroll student in the class (idempotent)
+                                        autoEnrollInClass(freshSession, currentUid);
                                         showSuccessDialog(distance);
                                     } else {
                                         tvScanStatus.setText(R.string.error_generic);
@@ -699,6 +701,36 @@ public class ScanQRActivity extends AppCompatActivity {
                 });
             });
         });
+    }
+
+    /**
+     * Automatically enroll the student in the class associated with this session.
+     * Looks up the class by className (which equals classId in sessions) and calls
+     * ClassRepository.enrollStudent — idempotent, safe to call on every scan.
+     */
+    private void autoEnrollInClass(AttendanceSession session, String studentId) {
+        if (session == null || session.getClassId() == null) return;
+        String className = session.getClassId(); // className is stored as classId
+
+        com.qrattend.app.data.repository.ClassRepository classRepo =
+                new com.qrattend.app.data.repository.ClassRepository();
+
+        // Find the class document whose className matches the session's classId
+        com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                .collection(com.qrattend.app.utils.Constants.CLASSES)
+                .whereEqualTo("className", className)
+                .whereEqualTo("teacherId", session.getTeacherId())
+                .limit(1)
+                .get()
+                .addOnSuccessListener(qs -> {
+                    if (qs != null && !qs.isEmpty()) {
+                        String classDocId = qs.getDocuments().get(0).getId();
+                        classRepo.enrollStudent(classDocId, studentId, t -> {
+                            Log.d(TAG, "autoEnrollInClass: " +
+                                    (t.isSuccessful() ? "enrolled in " + classDocId : "enroll failed"));
+                        });
+                    }
+                });
     }
 
     private void showSuccessDialog(float distanceMeters) {

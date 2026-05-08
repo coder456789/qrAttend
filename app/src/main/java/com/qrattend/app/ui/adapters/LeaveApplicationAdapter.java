@@ -19,6 +19,8 @@ import java.util.Locale;
 
 /**
  * RecyclerView adapter for the teacher's leave-application list.
+ * Tap → shows full detail + attachment.
+ * Long-press → Approve / Reject action dialog.
  */
 public class LeaveApplicationAdapter
         extends RecyclerView.Adapter<LeaveApplicationAdapter.ViewHolder> {
@@ -27,13 +29,23 @@ public class LeaveApplicationAdapter
         void onClick(LeaveApplication app);
     }
 
+    public interface OnItemLongClickListener {
+        void onLongClick(LeaveApplication app);
+    }
+
     private List<LeaveApplication> items = new ArrayList<>();
-    private final OnItemClickListener clickListener;
+    private final OnItemClickListener     clickListener;
+    private       OnItemLongClickListener longClickListener;
+
     private final SimpleDateFormat dateFormat =
             new SimpleDateFormat("dd MMM yyyy", Locale.getDefault());
 
     public LeaveApplicationAdapter(OnItemClickListener listener) {
         this.clickListener = listener;
+    }
+
+    public void setOnItemLongClickListener(OnItemLongClickListener l) {
+        this.longClickListener = l;
     }
 
     public void updateList(List<LeaveApplication> list) {
@@ -59,6 +71,12 @@ public class LeaveApplicationAdapter
         holder.tvSubmittedAt.setText(app.getSubmittedAt() != null
                 ? dateFormat.format(app.getSubmittedAt().toDate()) : "");
 
+        // Show 📎 badge if the application has an attachment
+        if (holder.tvAttachBadge != null) {
+            holder.tvAttachBadge.setVisibility(
+                    app.hasAttachment() ? View.VISIBLE : View.GONE);
+        }
+
         String status = app.getStatus() != null ? app.getStatus() : "Pending";
         holder.tvStatus.setText(status);
 
@@ -79,6 +97,11 @@ public class LeaveApplicationAdapter
         holder.itemView.setOnClickListener(v -> {
             if (clickListener != null) clickListener.onClick(app);
         });
+
+        holder.itemView.setOnLongClickListener(v -> {
+            if (longClickListener != null) longClickListener.onLongClick(app);
+            return true;
+        });
     }
 
     @Override
@@ -86,6 +109,7 @@ public class LeaveApplicationAdapter
 
     static class ViewHolder extends RecyclerView.ViewHolder {
         final TextView tvStudentName, tvRollNo, tvSubmittedAt, tvStatus;
+        final TextView tvAttachBadge;
         final View     viewStatusDot;
 
         ViewHolder(@NonNull View v) {
@@ -94,6 +118,7 @@ public class LeaveApplicationAdapter
             tvRollNo       = v.findViewById(R.id.tvRollNo);
             tvSubmittedAt  = v.findViewById(R.id.tvSubmittedAt);
             tvStatus       = v.findViewById(R.id.tvStatus);
+            tvAttachBadge  = v.findViewById(R.id.tvAttachBadge);
             viewStatusDot  = v.findViewById(R.id.viewStatusDot);
         }
     }

@@ -129,17 +129,17 @@ public class SettingsActivity extends AppCompatActivity {
             updates.put("phone", phone);
             studentRepo.updateStudent(uid, updates, task -> {
                 if (task.isSuccessful()) {
-                    Toast.makeText(this, getString(R.string.profile_saved), Toast.LENGTH_SHORT).show();
+                    com.qrattend.app.utils.SnackbarHelper.success(this, getString(R.string.profile_saved));
                 } else {
-                    Toast.makeText(this, getString(R.string.error_save_profile), Toast.LENGTH_SHORT).show();
+                    com.qrattend.app.utils.SnackbarHelper.error(this, getString(R.string.error_save_profile));
                 }
             });
         } else if (Constants.ROLE_TEACHER.equals(cachedRole)) {
             new TeacherRepository().updateTeacher(uid, updates, task -> {
                 if (task.isSuccessful()) {
-                    Toast.makeText(this, getString(R.string.profile_saved), Toast.LENGTH_SHORT).show();
+                    com.qrattend.app.utils.SnackbarHelper.success(this, getString(R.string.profile_saved));
                 } else {
-                    Toast.makeText(this, getString(R.string.error_save_profile), Toast.LENGTH_SHORT).show();
+                    com.qrattend.app.utils.SnackbarHelper.error(this, getString(R.string.error_save_profile));
                 }
             });
         }

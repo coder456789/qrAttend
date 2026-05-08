@@ -144,6 +144,65 @@ public class AttendanceRepository {
 
 
     /**
+     * At session end: for every student enrolled in the class who does NOT already
+     * have a record in this session, write an "Absent" record automatically.
+     *
+     * @param sessionId   the session that just ended
+     * @param classDocId  Firestore document ID of the class (to read enrolledStudents)
+     * @param subject     subject name for the record
+     */
+    public void markAbsentForMissing(@NonNull String sessionId,
+                                     @NonNull String classDocId,
+                                     @androidx.annotation.Nullable String subject) {
+        // 1. Fetch enrolled student list from the class doc
+        db.collection(Constants.CLASSES).document(classDocId).get()
+                .addOnSuccessListener(classDoc -> {
+                    if (classDoc == null || !classDoc.exists()) return;
+                    @SuppressWarnings("unchecked")
+                    java.util.List<String> enrolled =
+                            (java.util.List<String>) classDoc.get("enrolledStudents");
+                    if (enrolled == null || enrolled.isEmpty()) return;
+
+                    // 2. Fetch existing records to know who already scanned
+                    getRecordsRef(sessionId).get().addOnSuccessListener(recordsSnap -> {
+                        java.util.Set<String> alreadyMarked = new java.util.HashSet<>();
+                        for (com.google.firebase.firestore.DocumentSnapshot doc
+                                : recordsSnap.getDocuments()) {
+                            alreadyMarked.add(doc.getId()); // doc ID = studentId
+                        }
+
+                        // 3. For each enrolled student with no record → write Absent
+                        for (String studentId : enrolled) {
+                            if (alreadyMarked.contains(studentId)) continue;
+
+                            // Fetch student name/roll for the record
+                            db.collection(Constants.STUDENTS).document(studentId).get()
+                                    .addOnSuccessListener(studentDoc -> {
+                                        java.util.Map<String, Object> data = new java.util.HashMap<>();
+                                        data.put("status",         Constants.STATUS_ABSENT);
+                                        data.put("studentId",      studentId);
+                                        data.put("sessionId",      sessionId);
+                                        data.put("markedManually", false);
+                                        data.put("autoAbsent",     true);
+                                        data.put("time",           com.google.firebase.Timestamp.now());
+                                        if (studentDoc != null && studentDoc.exists()) {
+                                            data.put("studentName",
+                                                    studentDoc.getString("name"));
+                                            data.put("studentRollNo",
+                                                    studentDoc.getString("rollNo"));
+                                        }
+                                        if (subject != null) data.put("subject", subject);
+
+                                        getRecordsRef(sessionId)
+                                                .document(studentId)
+                                                .set(data, com.google.firebase.firestore.SetOptions.merge());
+                                    });
+                        }
+                    });
+                });
+    }
+
+    /**
      * Retrieves a student's attendance history across all sessions (Student History).
      * <p>
      * Optimized to filter on the server side to prevent overwhelming device RAM.

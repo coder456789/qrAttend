@@ -214,6 +214,31 @@ public class TeacherDashboardActivity extends AppCompatActivity {
                     tvEmptyClasses.setVisibility(View.GONE);
                     rvClasses.setVisibility(View.VISIBLE);
                     adapter.updateList(groups);
+
+                    // Overlay join codes from the 'classes' collection
+                    new com.qrattend.app.data.repository.ClassRepository()
+                            .getClassesByTeacher(uid, classDocs -> {
+                                if (classDocs == null) return;
+                                // Build a map: className → joinCode
+                                java.util.HashMap<String, String> codeMap = new java.util.HashMap<>();
+                                for (com.qrattend.app.data.model.ClassInfo ci : classDocs) {
+                                    if (ci.getClassName() != null && ci.getJoinCode() != null) {
+                                        codeMap.put(ci.getClassName(), ci.getJoinCode());
+                                    }
+                                }
+                                // Assign join codes to groups and refresh
+                                boolean changed = false;
+                                for (ClassGroupAdapter.ClassGroup g : groups) {
+                                    String code = codeMap.get(g.className);
+                                    if (code != null && !code.equals(g.joinCode)) {
+                                        g.joinCode = code;
+                                        changed = true;
+                                    }
+                                }
+                                if (changed) {
+                                    runOnUiThread(() -> adapter.updateList(groups));
+                                }
+                            });
                 }
             });
         });
