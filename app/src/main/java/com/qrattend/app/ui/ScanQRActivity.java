@@ -1,8 +1,6 @@
 package com.qrattend.app.ui;
 
 import android.Manifest;
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -178,14 +176,6 @@ public class ScanQRActivity extends AppCompatActivity {
      */
     // ── Connectivity Helper ─────────────────────────────────────────────────
 
-    private BluetoothAdapter getBluetoothAdapter() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            BluetoothManager mgr = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
-            return mgr != null ? mgr.getAdapter() : null;
-        }
-        return BluetoothAdapter.getDefaultAdapter();
-    }
-
     private boolean isWifiOn() {
         WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
         return wm != null && wm.isWifiEnabled();
@@ -197,16 +187,7 @@ public class ScanQRActivity extends AppCompatActivity {
                 || lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER));
     }
 
-    private boolean isBluetoothOn() {
-        try {
-            BluetoothAdapter bt = getBluetoothAdapter();
-            return bt != null && bt.isEnabled();
-        } catch (SecurityException e) {
-            // BLUETOOTH_CONNECT permission not yet granted (Android 12+) — treat as off
-            Log.w(TAG, "isBluetoothOn: SecurityException — BLUETOOTH_CONNECT not granted yet");
-            return false;
-        }
-    }
+    private boolean isBluetoothOn() { return true; /* Bluetooth not required — kept for backward compat */ }
 
     /**
      * Checks WiFi / Bluetooth / Location before opening the scanner.
@@ -220,7 +201,7 @@ public class ScanQRActivity extends AppCompatActivity {
      * When the user returns from Settings, onResume() re-checks and auto-proceeds.
      */
     private void showConnectivityDialog(Runnable onReady) {
-        if (isWifiOn() && isLocationOn() && isBluetoothOn()) {
+        if (isWifiOn() && isLocationOn()) {
             onReady.run();
             return;
         }
@@ -231,14 +212,12 @@ public class ScanQRActivity extends AppCompatActivity {
 
         new AlertDialog.Builder(this)
                 .setTitle(getString(R.string.connectivity_required_title))
-                .setMessage(getString(R.string.connectivity_required_message))
+                .setMessage("Please enable WiFi and Location to scan the QR code.")
                 .setCancelable(false)
                 .setPositiveButton(getString(R.string.connectivity_open_settings), (d, w) -> {
-                    // Open the main wireless settings page; user can toggle all three from there
                     startActivity(new Intent(Settings.ACTION_WIRELESS_SETTINGS));
                 })
                 .setNegativeButton(getString(R.string.cancel), (d, w) -> {
-                    // User chose not to enable services — abort scanning
                     finish();
                 })
                 .show();
@@ -256,15 +235,11 @@ public class ScanQRActivity extends AppCompatActivity {
         super.onResume();
         if (pendingStartAfterSettings && pendingOnReady != null) {
             pendingStartAfterSettings = false;
-            if (isWifiOn() && isLocationOn() && isBluetoothOn()) {
-                // All services are now on — proceed with scan
-                Log.d(TAG, "onResume: all services on, starting scan flow");
+            if (isWifiOn() && isLocationOn()) {
                 Runnable callback = pendingOnReady;
                 pendingOnReady = null;
                 callback.run();
             } else {
-                // One or more still off — re-show the mandatory dialog
-                Log.d(TAG, "onResume: services still off, re-showing dialog");
                 Runnable callback = pendingOnReady;
                 pendingOnReady = null;
                 showConnectivityDialog(callback);

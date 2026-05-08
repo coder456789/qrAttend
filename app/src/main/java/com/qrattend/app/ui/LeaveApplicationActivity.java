@@ -133,7 +133,7 @@ public class LeaveApplicationActivity extends AppCompatActivity {
         }
 
         // My Leaves button → history screen
-        MaterialButton btnMyLeaves = toolbar.findViewById(R.id.btnMyLeaves);
+        MaterialButton btnMyLeaves = findViewById(R.id.btnMyLeaves);
         if (btnMyLeaves != null) {
             btnMyLeaves.setOnClickListener(v ->
                     startActivity(new Intent(this, MyLeavesActivity.class)));
@@ -152,72 +152,59 @@ public class LeaveApplicationActivity extends AppCompatActivity {
     /**
      * Fetches all Firestore class documents where the current student's UID
      * appears in enrolledStudents[]. Populates the spinner.
+     * Uses a single Firestore query with document IDs.
      */
     private void loadEnrolledClasses() {
         if (currentUid == null) return;
-        classRepo.getAllClasses(allClasses -> {
-            classList.clear();
-            classDocIds.clear();
-            List<String> labels = new ArrayList<>();
 
-            for (int i = 0; i < allClasses.size(); i++) {
-                ClassInfo ci = allClasses.get(i);
-                if (ci.getEnrolledStudents() != null
-                        && ci.getEnrolledStudents().contains(currentUid)) {
-                    classList.add(ci);
-                    classDocIds.add(""); // doc ID resolved below
-                    labels.add(ci.getSubject() + " — " + ci.getClassName());
-                }
-            }
+        com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                .collection(com.qrattend.app.utils.Constants.CLASSES)
+                .get()
+                .addOnSuccessListener(qs -> runOnUiThread(() -> {
+                    classList.clear();
+                    classDocIds.clear();
+                    List<String> labels = new ArrayList<>();
 
-            // We need doc IDs too — fetch all classes with doc IDs
-            // Use a secondary fetch to get proper doc IDs via snapshot
-            com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                    .collection(com.qrattend.app.utils.Constants.CLASSES)
-                    .get()
-                    .addOnSuccessListener(qs -> runOnUiThread(() -> {
-                        classList.clear();
-                        classDocIds.clear();
-                        List<String> finalLabels = new ArrayList<>();
-
-                        for (com.google.firebase.firestore.DocumentSnapshot doc : qs.getDocuments()) {
-                            ClassInfo ci = doc.toObject(ClassInfo.class);
-                            if (ci == null) continue;
-                            if (ci.getEnrolledStudents() != null
-                                    && ci.getEnrolledStudents().contains(currentUid)) {
-                                classList.add(ci);
-                                classDocIds.add(doc.getId());
-                                finalLabels.add(ci.getSubject() + " — " + ci.getClassName());
-                            }
+                    for (com.google.firebase.firestore.DocumentSnapshot doc : qs.getDocuments()) {
+                        ClassInfo ci = doc.toObject(ClassInfo.class);
+                        if (ci == null) continue;
+                        if (ci.getEnrolledStudents() != null
+                                && ci.getEnrolledStudents().contains(currentUid)) {
+                            classList.add(ci);
+                            classDocIds.add(doc.getId());
+                            String label = (ci.getSubject() != null ? ci.getSubject() : "")
+                                    + " — "
+                                    + (ci.getClassName() != null ? ci.getClassName() : "");
+                            labels.add(label);
                         }
+                    }
 
-                        if (finalLabels.isEmpty()) {
-                            finalLabels.add("No enrolled classes found");
-                        }
+                    if (labels.isEmpty()) {
+                        labels.add("No enrolled classes found");
+                    }
 
-                        ArrayAdapter<String> adapter = new ArrayAdapter<>(
-                                this, android.R.layout.simple_spinner_item, finalLabels);
-                        adapter.setDropDownViewResource(
-                                android.R.layout.simple_spinner_dropdown_item);
-                        spinnerClass.setAdapter(adapter);
+                    ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                            this, android.R.layout.simple_spinner_item, labels);
+                    adapter.setDropDownViewResource(
+                            android.R.layout.simple_spinner_dropdown_item);
+                    spinnerClass.setAdapter(adapter);
 
-                        // Spinner listener
-                        spinnerClass.setOnItemSelectedListener(
-                                new android.widget.AdapterView.OnItemSelectedListener() {
-                                    @Override
-                                    public void onItemSelected(android.widget.AdapterView<?> p,
-                                                               View v, int pos, long id) {
-                                        if (pos >= classList.size()) return;
-                                        onClassSelected(pos);
-                                    }
-                                    @Override
-                                    public void onNothingSelected(android.widget.AdapterView<?> p) {}
-                                });
+                    spinnerClass.setOnItemSelectedListener(
+                            new android.widget.AdapterView.OnItemSelectedListener() {
+                                @Override
+                                public void onItemSelected(android.widget.AdapterView<?> p,
+                                                           View v, int pos, long id) {
+                                    if (pos < classList.size()) onClassSelected(pos);
+                                }
+                                @Override
+                                public void onNothingSelected(android.widget.AdapterView<?> p) {}
+                            });
 
-                        // Auto-select first class
-                        if (!classList.isEmpty()) onClassSelected(0);
-                    }));
-        });
+                    if (!classList.isEmpty()) onClassSelected(0);
+                }))
+                .addOnFailureListener(e -> runOnUiThread(() ->
+                        com.qrattend.app.utils.SnackbarHelper.error(this,
+                                "Failed to load classes. Check connection.")));
     }
 
     private void onClassSelected(int pos) {

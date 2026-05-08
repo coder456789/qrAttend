@@ -130,14 +130,13 @@ public class MyLeavesActivity extends AppCompatActivity {
             // Reason (truncated)
             h.tvReason.setText(app.getReason() != null ? app.getReason() : "");
 
-            // Attachment
-            boolean hasAttachment = app.getAttachmentUrl() != null
-                    && !app.getAttachmentUrl().isEmpty();
+            // Attachment — show if URL or Base64 is present
+            boolean hasAttachment = app.hasAttachment();
             h.cardAttachment.setVisibility(hasAttachment ? View.VISIBLE : View.GONE);
             if (hasAttachment) {
                 h.tvAttachmentName.setText(app.getAttachmentFileName() != null
                         ? app.getAttachmentFileName() : "View attachment");
-                h.cardAttachment.setOnClickListener(v -> openAttachment(app.getAttachmentUrl()));
+                h.cardAttachment.setOnClickListener(v -> openAttachment(app));
             }
         }
 
@@ -163,13 +162,63 @@ public class MyLeavesActivity extends AppCompatActivity {
         }
     }
 
-    private void openAttachment(String url) {
-        try {
-            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(Intent.createChooser(intent, "Open with…"));
-        } catch (Exception e) {
-            com.qrattend.app.utils.SnackbarHelper.error(this, "Cannot open attachment.");
+    private void openAttachment(LeaveApplication app) {
+        String url  = app.getAttachmentUrl();
+        String b64  = app.getAttachmentBase64();
+        String mime = app.getAttachmentBase64MimeType() != null
+                ? app.getAttachmentBase64MimeType() : app.getAttachmentMimeType();
+
+        // Strategy 1: URL
+        if (url != null && !url.isEmpty()) {
+            try {
+                Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(Intent.createChooser(intent, "Open with…"));
+                return;
+            } catch (Exception ignored) {}
         }
+
+        // Strategy 2: Base64
+        if (b64 != null && !b64.isEmpty()) {
+            new Thread(() -> {
+                try {
+                    byte[] bytes = android.util.Base64.decode(b64, android.util.Base64.NO_WRAP);
+                    String ext = "";
+                    if (mime != null) {
+                        if (mime.contains("pdf")) ext = ".pdf";
+                        else if (mime.contains("png")) ext = ".png";
+                        else if (mime.contains("jpeg") || mime.contains("jpg")) ext = ".jpg";
+                    }
+                    String name = (app.getAttachmentFileName() != null
+                            && !app.getAttachmentFileName().isEmpty())
+                            ? app.getAttachmentFileName() : "attachment" + ext;
+                    java.io.File tmp = new java.io.File(getCacheDir(), name);
+                    try (java.io.FileOutputStream fos = new java.io.FileOutputStream(tmp)) {
+                        fos.write(bytes);
+                    }
+                    Uri fileUri = androidx.core.content.FileProvider.getUriForFile(
+                            this, "com.qrattend.app.fileprovider", tmp);
+                    Intent intent = new Intent(Intent.ACTION_VIEW);
+                    intent.setDataAndType(fileUri,
+                            mime != null ? mime : "application/octet-stream");
+                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                            | Intent.FLAG_ACTIVITY_NEW_TASK);
+                    runOnUiThread(() -> {
+                        try {
+                            startActivity(Intent.createChooser(intent, "Open with…"));
+                        } catch (Exception e) {
+                            com.qrattend.app.utils.SnackbarHelper.error(this,
+                                    "No app can open this file type.");
+                        }
+                    });
+                } catch (Exception e) {
+                    runOnUiThread(() -> com.qrattend.app.utils.SnackbarHelper.error(this,
+                            "Failed to decode attachment."));
+                }
+            }).start();
+            return;
+        }
+
+        com.qrattend.app.utils.SnackbarHelper.error(this, "Cannot open attachment.");
     }
 }
