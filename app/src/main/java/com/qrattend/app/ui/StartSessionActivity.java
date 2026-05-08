@@ -324,14 +324,35 @@ public class StartSessionActivity extends AppCompatActivity {
                     String uid = authManager.getCurrentUserId();
                     if (uid == null) return;
 
+                    // Generate unique 6-char alphanumeric join code
+                    String joinCode = generateJoinCode();
+
                     ClassInfo newClass = new ClassInfo(className, subject, uid, new ArrayList<>());
+                    newClass.setJoinCode(joinCode);
+
                     String docId = "class_" + className.replaceAll("\\s+", "_")
                             + "_" + System.currentTimeMillis();
 
                     classRepo.addClass(docId, newClass, task -> {
                         if (task.isSuccessful()) {
-                            Toast.makeText(this, getString(R.string.class_created), Toast.LENGTH_SHORT).show();
-                            loadClasses();
+                            // Show the join code to the teacher
+                            new AlertDialog.Builder(this)
+                                    .setTitle("Class Created! 🎉")
+                                    .setMessage("Share this code with your students so they can join:\n\n"
+                                            + "📋  " + joinCode + "\n\n"
+                                            + "Class: " + subject + " — " + className)
+                                    .setPositiveButton("Copy & Close", (d, w) -> {
+                                        android.content.ClipboardManager clipboard =
+                                                (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                                        android.content.ClipData clip =
+                                                android.content.ClipData.newPlainText("Join Code", joinCode);
+                                        clipboard.setPrimaryClip(clip);
+                                        Toast.makeText(this, "Code copied: " + joinCode, Toast.LENGTH_SHORT).show();
+                                        loadClasses();
+                                    })
+                                    .setNegativeButton("Close", (d, w) -> loadClasses())
+                                    .setCancelable(false)
+                                    .show();
                         } else {
                             Toast.makeText(this, getString(R.string.error_create_class), Toast.LENGTH_SHORT).show();
                         }
@@ -339,5 +360,19 @@ public class StartSessionActivity extends AppCompatActivity {
                 })
                 .setNegativeButton(R.string.cancel, null)
                 .show();
+    }
+
+    /**
+     * Generates a random 6-character uppercase alphanumeric join code (e.g. "AX7K9M").
+     * Excludes look-alike characters: 0, O, 1, I, L.
+     */
+    private String generateJoinCode() {
+        String chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+        java.util.Random rnd = new java.util.Random();
+        StringBuilder sb = new StringBuilder(6);
+        for (int i = 0; i < 6; i++) {
+            sb.append(chars.charAt(rnd.nextInt(chars.length())));
+        }
+        return sb.toString();
     }
 }

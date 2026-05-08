@@ -36,6 +36,9 @@ public final class Constants {
     /** Firestore subcollection name under each session for attendance records. */
     public static final String RECORDS = "records";
 
+    /** Firestore sub-collection under each teacher document for weekly timetable entries. */
+    public static final String TIMETABLE = "timetable";
+
     // ── QR Code Settings ────────────────────────────────────────────────
 
     /** Interval (in milliseconds) between QR code nonce refreshes. */

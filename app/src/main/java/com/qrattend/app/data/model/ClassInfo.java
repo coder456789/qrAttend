@@ -32,6 +32,9 @@ public class ClassInfo {
      */
     private List<String> enrolledStudents;
 
+    /** 6-character alphanumeric join code students enter to enroll. */
+    private String joinCode;
+
     /**
      * Empty constructor required by Firestore for deserialization.
      * <p>Initializes {@code enrolledStudents} to an empty {@link ArrayList}
@@ -91,6 +94,14 @@ public class ClassInfo {
 
     public void setEnrolledStudents(List<String> enrolledStudents) {
         this.enrolledStudents = enrolledStudents;
+    }
+
+    public String getJoinCode() {
+        return joinCode;
+    }
+
+    public void setJoinCode(String joinCode) {
+        this.joinCode = joinCode;
     }
 
     // ── Debug ───────────────────────────────────────────────────────────

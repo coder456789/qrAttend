@@ -127,6 +127,16 @@ service cloud.firestore {
                     );
 
       allow delete: if isAdmin();
+
+      // ─────────────────────────────────────────────────────────────────
+      //  /teachers/{teacherId}/timetable/{entryId}
+      // ─────────────────────────────────────────────────────────────────
+      //  Only the owning teacher or an admin can manage timetable entries.
+      //
+      match /timetable/{entryId} {
+        allow read, write: if isAuthenticated()
+                           && (uid() == teacherId || isAdmin());
+      }
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -154,6 +164,10 @@ service cloud.firestore {
                     && (
                       // Only the assigned teacher can update their own class
                       (isTeacher() && resource.data.teacherId == uid())
+                      // Students can only add/remove themselves from enrolledStudents
+                      || (isStudent()
+                          && request.resource.data.diff(resource.data).affectedKeys()
+                              .hasOnly(['enrolledStudents']))
                       || isAdmin()
                     )
                     // Prevent teachers from reassigning to another teacher
@@ -236,6 +250,31 @@ service cloud.firestore {
 
         allow delete: if isAdmin();
       }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  /leaveApplications/{applicationId}
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    //  CREATE  → Student (own application only)
+    //  READ    → Owning student, or any teacher / admin
+    //  UPDATE  → Teacher or admin (for status changes)
+    //  DELETE  → Admin only
+    //
+    match /leaveApplications/{applicationId} {
+
+      allow create: if isStudent()
+                    && request.resource.data.studentId == uid();
+
+      allow read:   if isAuthenticated()
+                    && (
+                      (isStudent() && resource.data.studentId == uid())
+                      || isTeacherOrAdmin()
+                    );
+
+      allow update: if isTeacherOrAdmin();
+
+      allow delete: if isAdmin();
     }
 
     // ═══════════════════════════════════════════════════════════════════

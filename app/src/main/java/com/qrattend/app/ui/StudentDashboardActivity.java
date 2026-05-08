@@ -69,6 +69,12 @@ public class StudentDashboardActivity extends AppCompatActivity {
         findViewById(R.id.cardHistory).setOnClickListener(v ->
                 startActivity(new Intent(this, AttendanceHistoryActivity.class)));
 
+        findViewById(R.id.cardJoinClass).setOnClickListener(v ->
+                startActivity(new Intent(this, JoinClassActivity.class)));
+
+        findViewById(R.id.cardLeaveApplication).setOnClickListener(v ->
+                startActivity(new Intent(this, LeaveApplicationActivity.class)));
+
         toolbar.setNavigationOnClickListener(v ->
                 startActivity(new Intent(this, SettingsActivity.class)));
 

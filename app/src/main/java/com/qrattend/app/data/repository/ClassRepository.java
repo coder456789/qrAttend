@@ -100,6 +100,26 @@ public class ClassRepository {
                 });
     }
 
+    /**
+     * Looks up a single class by its 6-character join code.
+     * The callback receives a Pair of (documentId, ClassInfo), or null if not found.
+     */
+    public void getClassByJoinCode(@NonNull String joinCode,
+                                   @NonNull OnSuccessListener<android.util.Pair<String, ClassInfo>> callback) {
+        classesRef.whereEqualTo("joinCode", joinCode)
+                .limit(1)
+                .get()
+                .addOnSuccessListener(qs -> {
+                    if (qs.isEmpty()) {
+                        callback.onSuccess(null);
+                    } else {
+                        com.google.firebase.firestore.DocumentSnapshot doc = qs.getDocuments().get(0);
+                        callback.onSuccess(new android.util.Pair<>(doc.getId(),
+                                doc.toObject(ClassInfo.class)));
+                    }
+                });
+    }
+
     // ── Update ──────────────────────────────────────────────────────────
 
     /**

@@ -81,6 +81,18 @@ public class TeacherDashboardActivity extends AppCompatActivity {
         findViewById(R.id.cardStartSession).setOnClickListener(v ->
                 startActivity(new Intent(this, StartSessionActivity.class)));
 
+        View cardTimetable = findViewById(R.id.cardTimetable);
+        if (cardTimetable != null) {
+            cardTimetable.setOnClickListener(v ->
+                    startActivity(new Intent(this, TimetableActivity.class)));
+        }
+
+        View cardLeaveApplications = findViewById(R.id.cardLeaveApplications);
+        if (cardLeaveApplications != null) {
+            cardLeaveApplications.setOnClickListener(v ->
+                    startActivity(new Intent(this, LeaveApplicationsActivity.class)));
+        }
+
         loadData();
     }
 
