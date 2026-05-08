@@ -36,7 +36,6 @@ android {
 
     packaging {
         jniLibs {
-            //for Android 15+ compatibility
             useLegacyPackaging = false
         }
     }
@@ -79,4 +78,3 @@ dependencies {
     implementation "androidx.camera:camera-lifecycle:${camerax_version}"
     implementation "androidx.camera:camera-view:${camerax_version}"
 }
-android { packagingOptions { jniLibs { useLegacyPackaging = true } } }

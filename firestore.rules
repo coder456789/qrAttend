@@ -87,10 +87,15 @@ service cloud.firestore {
 
       allow update: if isAuthenticated()
                     && (
-                      // Students can only update their own deviceId, deviceId2, fcmToken
+                      // Students can update their own profile and device-binding fields
                       (uid() == studentId
                         && request.resource.data.diff(resource.data).affectedKeys()
-                            .hasOnly(['deviceId', 'deviceId2', 'fcmToken']))
+                            .hasOnly(['name', 'phone', 'deviceId', 'deviceId2',
+                                      'fcmToken', 'lastUnbindDate']))
+                      // Teachers can only clear deviceId / deviceId2 (device unbind action)
+                      || (isTeacher()
+                          && request.resource.data.diff(resource.data).affectedKeys()
+                              .hasOnly(['deviceId', 'deviceId2']))
                       // Admins can update anything
                       || isAdmin()
                     );
@@ -118,10 +123,10 @@ service cloud.firestore {
 
       allow update: if isAuthenticated()
                     && (
-                      // Teachers can only update their own fcmToken
+                      // Teachers can update their own device and token fields
                       (uid() == teacherId
                         && request.resource.data.diff(resource.data).affectedKeys()
-                            .hasOnly(['fcmToken']))
+                            .hasOnly(['fcmToken', 'deviceId', 'activeDeviceId']))
                       // Admins can update anything
                       || isAdmin()
                     );

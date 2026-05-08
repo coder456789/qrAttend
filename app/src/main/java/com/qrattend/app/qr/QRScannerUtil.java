@@ -2,6 +2,8 @@ package com.qrattend.app.qr;
 
 import android.content.Context;
 import android.media.Image;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -70,6 +72,7 @@ public class QRScannerUtil {
     private final Context        context;
     private final PreviewView    previewView;
     private final LifecycleOwner lifecycleOwner;
+    private final Handler        mainHandler = new Handler(Looper.getMainLooper());
 
     /**
      * AES session key from AttendanceSession.getSessionKey()
@@ -146,7 +149,7 @@ public class QRScannerUtil {
                 mediaImage, imageProxy.getImageInfo().getRotationDegrees());
 
         barcodeScanner.process(inputImage)
-                .addOnSuccessListener(barcodes -> {
+                .addOnSuccessListener(cameraExecutor, barcodes -> {
                     for (Barcode barcode : barcodes) {
                         String raw = barcode.getRawValue();
                         if (raw != null && !scanHandled) handleRawQR(raw, callback);
@@ -172,7 +175,8 @@ public class QRScannerUtil {
                     + " payloadLen=" + encryptedPayload.length());
             if (!scanHandled) { 
                 scanHandled = true; 
-                callback.onError("qr_decrypt_fail: " + e.getMessage() + " keyLen=" + (sessionKey != null ? sessionKey.length() : "null")); 
+                final String errorMsg = "qr_decrypt_fail: " + e.getMessage() + " keyLen=" + (sessionKey != null ? sessionKey.length() : "null");
+                mainHandler.post(() -> callback.onError(errorMsg));
             }
             return;
         }
@@ -181,10 +185,13 @@ public class QRScannerUtil {
             QRGeneratorUtil.QRPayload payload = QRGeneratorUtil.QRPayload.fromJson(json);
             Log.d("QRScan", "Parse SUCCESS. sessionId=" + payload.sessionId);
             scanHandled = true;
-            callback.onPayloadDecoded(payload);
+            mainHandler.post(() -> callback.onPayloadDecoded(payload));
         } catch (Exception e) {
             Log.e("QRScan", "Parse FAILED. json=" + json + " err=" + e.getMessage());
-            if (!scanHandled) { scanHandled = true; callback.onError("parse_fail"); }
+            if (!scanHandled) { 
+                scanHandled = true; 
+                mainHandler.post(() -> callback.onError("parse_fail")); 
+            }
         }
     }
 

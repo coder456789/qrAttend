@@ -1,6 +1,7 @@
 package com.qrattend.app;
 
 import android.Manifest;
+import android.app.ProgressDialog;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Bundle;
@@ -23,6 +24,7 @@ public class ScanTestActivity extends AppCompatActivity {
     private TextView resultText;
     private QRScannerUtil scanner;
     private String sessionKey;
+    private ProgressDialog progressDialog;
 
     private final ActivityResultLauncher<String> cameraPermissionLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
@@ -88,15 +90,27 @@ public class ScanTestActivity extends AppCompatActivity {
 
             @Override
             public void onError(String reason) {
+                if (isFinishing() || isDestroyed()) return;
                 resultText.setText("Error: " + reason);
             }
         });
     }
 
     private void showPopupWithQrAndLocation(QRGeneratorUtil.QRPayload payload) {
+        if (isFinishing() || isDestroyed()) return;
+
+        // Visual feedback for the long location fetch (12-14 seconds)
+        progressDialog = new ProgressDialog(this);
+        progressDialog.setMessage("QR Scanned! Fetching precise location...\nThis may take up to 15 seconds.");
+        progressDialog.setCancelable(false);
+        progressDialog.show();
+
         LocationHelper.fetchCurrentLocation(this, new LocationHelper.LocationCallback() {
             @Override
             public void onSuccess(Location location) {
+                if (isFinishing() || isDestroyed()) return;
+                if (progressDialog != null) progressDialog.dismiss();
+
                 String message =
                         "QR SCANNED\n\n" +
                                 "session_id: " + payload.sessionId + "\n" +
@@ -119,6 +133,9 @@ public class ScanTestActivity extends AppCompatActivity {
 
             @Override
             public void onFailure(String reason) {
+                if (isFinishing() || isDestroyed()) return;
+                if (progressDialog != null) progressDialog.dismiss();
+
                 String message =
                         "QR SCANNED\n\n" +
                                 "session_id: " + payload.sessionId + "\n" +
@@ -140,8 +157,29 @@ public class ScanTestActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onPause() {
+        super.onPause();
+        // Release camera resources immediately when not in focus
+        if (scanner != null) {
+            scanner.stopScanning();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Optionally restart scanning if it was stopped
+        if (scanner != null && ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            startScanner();
+        }
+    }
+
+    @Override
     protected void onDestroy() {
         super.onDestroy();
+        if (progressDialog != null && progressDialog.isShowing()) {
+            progressDialog.dismiss();
+        }
         if (scanner != null) {
             scanner.stopScanning();
         }
