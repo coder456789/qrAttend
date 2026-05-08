@@ -54,6 +54,8 @@
     <string name="filter_all">All</string>
     <string name="filter_present">Present</string>
     <string name="filter_rejected">Rejected</string>
+    <string name="filter_absent">Absent</string>
+    <string name="filter_leave">Leave</string>
     <string name="empty_history">No attendance records found</string>
     <string name="record_date_format">dd MMM yyyy, hh:mm a</string>
 
@@ -63,7 +65,7 @@
     <string name="validating">Validating attendance…</string>
     <string name="attendance_success">Attendance Marked!</string>
     <string name="attendance_success_message">Your attendance has been recorded successfully.</string>
-    <string name="distance_from_teacher">📍 Distance from teacher: %1$s meters</string>
+    <string name="distance_from_teacher">Distance from teacher: %1$s m</string>
     <string name="attendance_failed">Attendance Rejected</string>
     <string name="try_again">Try Again</string>
     <string name="error_camera_permission">Camera permission is required to scan QR codes</string>
@@ -73,7 +75,7 @@
     <string name="error_already_marked">You have already marked attendance for this session.</string>
     <string name="error_session_not_found">Session not found or has ended.</string>
     <string name="rejection_location_mismatch">You are not within the classroom range.</string>
-    <string name="rejection_device_mismatch">This device is not registered to your account.</string>
+    <string name="rejection_device_mismatch">This device is not registered to your account. Only one device may be used per account. Unbind your device in Settings if you need to switch.</string>
     <string name="rejection_nonce_expired">QR code has expired. Wait for the next one.</string>
     <string name="rejection_root_detected">Rooted or emulated device detected.</string>
     <string name="acquiring_location">Acquiring precise location…</string>
@@ -183,6 +185,23 @@
     <string name="preferences">Preferences</string>
     <string name="notifications">Notifications</string>
     <string name="dark_mode">Dark Mode</string>
+
+    <!-- Device Binding -->
+    <string name="device_binding">Device Binding</string>
+    <string name="unbind_device">Unbind Device</string>
+    <string name="unbind_device_subtitle">Remove this device from your account</string>
+    <string name="unbind_device_warning_title">Unbind Device?</string>
+    <string name="unbind_device_warning_message">You can unbind your device only once every 30 days. Are you sure you want to continue?</string>
+    <string name="unbind_device_continue">Continue to Unbind</string>
+    <string name="unbind_device_go_back">Go Back</string>
+    <string name="unbind_device_success">Your device has been unbound. The next device you scan a QR code from will be bound to your account.</string>
+    <string name="unbind_device_rate_limit">You can only unbind your device once every 30 days. Please wait %1$d more day(s).</string>
+    <string name="unbind_device_loading">Checking device status…</string>
+
+    <!-- Connectivity Check -->
+    <string name="connectivity_required_title">Enable Required Services</string>
+    <string name="connectivity_required_message">Please enable WiFi, Bluetooth, and Location to scan the QR code.</string>
+    <string name="connectivity_open_settings">Open Settings</string>
     <string name="about">About</string>
     <string name="version_info">Version %1$s</string>
     <string name="team_info">QR-Attend Team</string>

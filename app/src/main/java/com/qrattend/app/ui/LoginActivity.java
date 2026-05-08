@@ -103,21 +103,77 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void navigateByRole(String role) {
-        Intent intent;
         switch (role) {
             case Constants.ROLE_STUDENT:
-                intent = new Intent(this, StudentDashboardActivity.class);
+                startActivity(new Intent(this, StudentDashboardActivity.class));
+                finish();
                 break;
             case Constants.ROLE_TEACHER:
-                intent = new Intent(this, TeacherDashboardActivity.class);
+                checkTeacherDeviceAndProceed();
                 break;
-
             default:
                 Toast.makeText(this, getString(R.string.error_login_failed), Toast.LENGTH_SHORT).show();
-                return;
+                break;
         }
-        startActivity(intent);
-        finish();
+    }
+
+    /**
+     * Teacher device enforcement logic:
+     * <ul>
+     *   <li>If activeDeviceId is set and ≠ this device → session running elsewhere → BLOCK.</li>
+     *   <li>Otherwise → update deviceId to this device (auto-logout old device) → PROCEED.</li>
+     * </ul>
+     */
+    private void checkTeacherDeviceAndProceed() {
+        String uid = authManager.getCurrentUserId();
+        if (uid == null) return;
+
+        String thisDeviceId = com.qrattend.app.security.DeviceFingerprint.getFingerprint(this);
+
+        new com.qrattend.app.data.repository.TeacherRepository().getTeacher(uid, teacher -> {
+            runOnUiThread(() -> {
+                if (teacher == null) {
+                    // First-time or missing doc — proceed
+                    registerTeacherDevice(uid, thisDeviceId);
+                    return;
+                }
+
+                String activeDevice = teacher.getActiveDeviceId();
+                if (activeDevice != null && !activeDevice.isEmpty()
+                        && !activeDevice.equals(thisDeviceId)) {
+                    // Session is active on ANOTHER device → block
+                    setLoading(false);
+                    new androidx.appcompat.app.AlertDialog.Builder(this)
+                            .setTitle("Session Active on Another Device")
+                            .setMessage("You have an active attendance session running on another device.\n\n"
+                                    + "Please end that session first, or wait for it to expire before logging in here.")
+                            .setPositiveButton(getString(R.string.ok), (d, w) -> {
+                                authManager.logout(this);
+                            })
+                            .setCancelable(false)
+                            .show();
+                    return;
+                }
+
+                // No active session on another device → proceed, overwrite old deviceId
+                registerTeacherDevice(uid, thisDeviceId);
+            });
+        });
+    }
+
+    /**
+     * Writes this device's fingerprint to the teacher doc (overwrites any previous device).
+     * The old device will detect the mismatch on its next dashboard refresh and auto-logout.
+     */
+    private void registerTeacherDevice(String uid, String deviceId) {
+        java.util.Map<String, Object> update = new java.util.HashMap<>();
+        update.put("deviceId", deviceId);
+        new com.qrattend.app.data.repository.TeacherRepository().updateTeacher(uid, update, task -> {
+            runOnUiThread(() -> {
+                startActivity(new Intent(this, TeacherDashboardActivity.class));
+                finish();
+            });
+        });
     }
 
     private void setLoading(boolean loading) {

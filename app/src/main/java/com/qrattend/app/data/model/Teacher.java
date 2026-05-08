@@ -28,6 +28,15 @@ public class Teacher {
     /** Firebase Cloud Messaging token for push notifications. */
     private String fcmToken;
 
+    /** Device fingerprint of the currently logged-in device. */
+    private String deviceId;
+
+    /**
+     * Device ID set when a session is active. While this is non-null,
+     * login from another device is blocked. Cleared when the session ends.
+     */
+    private String activeDeviceId;
+
     /**
      * Empty constructor required by Firestore for deserialization.
      */
@@ -92,6 +101,22 @@ public class Teacher {
 
     public void setFcmToken(String fcmToken) {
         this.fcmToken = fcmToken;
+    }
+
+    public String getDeviceId() {
+        return deviceId;
+    }
+
+    public void setDeviceId(String deviceId) {
+        this.deviceId = deviceId;
+    }
+
+    public String getActiveDeviceId() {
+        return activeDeviceId;
+    }
+
+    public void setActiveDeviceId(String activeDeviceId) {
+        this.activeDeviceId = activeDeviceId;
     }
 
     // ── Debug ───────────────────────────────────────────────────────────

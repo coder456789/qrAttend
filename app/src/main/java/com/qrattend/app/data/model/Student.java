@@ -50,6 +50,13 @@ public class Student {
     private String fcmToken;
 
     /**
+     * ISO date (yyyy-MM-dd) of the last time this student unbound their device.
+     * Null / empty means the student has never unbound. Used to enforce the
+     * 30-day rate limit on device unbinding.
+     */
+    private String lastUnbindDate;
+
+    /**
      * Empty constructor required by Firestore for deserialization.
      */
     public Student() {
@@ -87,6 +94,11 @@ public class Student {
     public String getRollNo() { return rollNo; }
     public void setRollNo(String rollNo) { this.rollNo = rollNo; }
 
+    /** Transient field — holds the Firestore document ID (Firebase UID). Not stored in Firestore. */
+    private String studentId;
+    public String getStudentId() { return studentId; }
+    public void setStudentId(String studentId) { this.studentId = studentId; }
+
     /**
      * Returns the class/batch name.
      * <p>Annotated with {@code @PropertyName("class")} so Firestore reads/writes
@@ -115,6 +127,9 @@ public class Student {
 
     public String getFcmToken() { return fcmToken; }
     public void setFcmToken(String fcmToken) { this.fcmToken = fcmToken; }
+
+    public String getLastUnbindDate() { return lastUnbindDate; }
+    public void setLastUnbindDate(String lastUnbindDate) { this.lastUnbindDate = lastUnbindDate; }
 
     // ── Debug ───────────────────────────────────────────────────────────
 

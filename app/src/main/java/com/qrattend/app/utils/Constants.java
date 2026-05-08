@@ -46,11 +46,11 @@ public final class Constants {
 
     /**
      * Grace period (ms) for the PREVIOUS nonce after a new one is generated.
-     * When the QR refreshes, the old nonce stays valid in Firestore for this
-     * duration so students whose GPS collection (up to 14s) causes a delay
-     * can still validate the nonce they originally scanned.
+     * After the QR disappears from screen any scan attempt using the old nonce
+     * is treated as invalid once this window expires.
+     * Reduced from 20 s → 6 s per security requirement.
      */
-    public static final long PREVIOUS_NONCE_GRACE_MS = 20_000L; // 20 seconds
+    public static final long PREVIOUS_NONCE_GRACE_MS = 6_000L; // 6 seconds
 
     /** Default QR code bitmap size in pixels (width = height). */
     public static final int QR_SIZE = 800;
@@ -95,8 +95,8 @@ public final class Constants {
 
     // ── Device ──────────────────────────────────────────────────────────
 
-    /** Maximum number of registered devices per student account. */
-    public static final int MAX_DEVICES = 2;
+    /** Maximum number of registered devices per student account (single-device binding). */
+    public static final int MAX_DEVICES = 1;
 
     // ── SharedPreferences Keys ──────────────────────────────────────────
 
@@ -122,8 +122,14 @@ public final class Constants {
     /** Status value when a student's attendance is accepted. */
     public static final String STATUS_PRESENT = "present";
 
-    /** Status value when a student's attendance is rejected. */
+    /** Status value when a student's attendance is rejected by the system. */
     public static final String STATUS_REJECTED = "rejected";
+
+    /** Status value set manually by a teacher when a student was absent. */
+    public static final String STATUS_ABSENT = "Absent";
+
+    /** Status value set manually by a teacher for an approved leave. */
+    public static final String STATUS_LEAVE = "Leave";
 
     // ── Rejection Reason Codes ──────────────────────────────────────────
 

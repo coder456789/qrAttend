@@ -2,12 +2,15 @@ package com.qrattend.app.data.model;
 
 import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.GeoPoint;
-import com.google.firebase.firestore.IgnoreExtraProperties;
 
 /**
- * Represents a single student's attendance record.
+ * Represents a single student's attendance record within a session.
+ * <p>
+ * Firestore Path: {@code attendanceSessions/{sessionId}/records/{studentId}}
+ * <br>
+ * Document ID: The student's document ID (ensures one record per student per session)
+ * </p>
  */
-@IgnoreExtraProperties
 public class AttendanceRecord {
 
     private String status;
@@ -17,16 +20,16 @@ public class AttendanceRecord {
     private String rejectionReason;
     private String studentId;
     private String sessionId;
-    
-    // Missing fields found in Firestore logs
-    private String subject;
-    private String studentName;
-    private String studentRollNo;
 
-    public AttendanceRecord() {}
+    /**
+     * Empty constructor required by Firestore for deserialization.
+     */
+    public AttendanceRecord() {
+    }
 
-    public AttendanceRecord(String status, Timestamp time, String deviceId, GeoPoint location, 
-                            String rejectionReason, String studentId, String sessionId) {
+    public AttendanceRecord(String status, Timestamp time, String deviceId,
+                            GeoPoint location, String rejectionReason,
+                            String studentId, String sessionId) {
         this.status = status;
         this.time = time;
         this.deviceId = deviceId;
@@ -36,7 +39,8 @@ public class AttendanceRecord {
         this.sessionId = sessionId;
     }
 
-    // Getters and Setters
+    // ── Getters and Setters ─────────────────────────────────────────────
+
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
 
@@ -58,12 +62,16 @@ public class AttendanceRecord {
     public String getSessionId() { return sessionId; }
     public void setSessionId(String sessionId) { this.sessionId = sessionId; }
 
-    public String getSubject() { return subject; }
-    public void setSubject(String subject) { this.subject = subject; }
-
-    public String getStudentName() { return studentName; }
-    public void setStudentName(String studentName) { this.studentName = studentName; }
-
-    public String getStudentRollNo() { return studentRollNo; }
-    public void setStudentRollNo(String studentRollNo) { this.studentRollNo = studentRollNo; }
+    @Override
+    public String toString() {
+        return "AttendanceRecord{" +
+                "status='" + status + '\'' +
+                ", time=" + time +
+                ", deviceId='" + deviceId + '\'' +
+                ", location=" + location +
+                ", rejectionReason='" + rejectionReason + '\'' +
+                ", studentId='" + studentId + '\'' +
+                ", sessionId='" + sessionId + '\'' +
+                '}';
+    }
 }

@@ -3,16 +3,6 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
-
-    <!-- Notifications (Android 13+) -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
-    <!-- Exact alarms for reliable 5-min class reminders (Android 12+) -->
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"
-        tools:targetApi="s" />
-
-    <!-- Required to reschedule alarms after device reboot -->
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <!-- Precise location needed for geofencing while scanning -->
@@ -21,38 +11,6 @@
 
     <!-- Camera needed for QR scanning -->
     <uses-permission android:name="android.permission.CAMERA" />
-
-    <!-- Bluetooth — legacy (pre-Android 12) -->
-    <uses-permission android:name="android.permission.BLUETOOTH"
-        android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
-        android:maxSdkVersion="30" />
-
-    <!-- Bluetooth — Android 12+ (API 31+) -->
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
-        android:usesPermissionFlags="neverForLocation"
-        tools:targetApi="s" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"
-        tools:targetApi="s" />
-
-    <!-- WiFi state checks -->
-    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
-
-    <!-- Storage — for writing CSV export files (Android < 10) -->
-    <uses-permission
-        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="28" />
-    <uses-permission
-        android:name="android.permission.READ_EXTERNAL_STORAGE"
-        android:maxSdkVersion="32" />
-    <!-- Media access for Android 13+ (file picker for leave proofs) -->
-    <uses-permission
-        android:name="android.permission.READ_MEDIA_IMAGES"
-        tools:targetApi="tiramisu" />
-    <uses-permission
-        android:name="android.permission.READ_MEDIA_VIDEO"
-        tools:targetApi="tiramisu" />
 
     <!-- Background location is NOT needed as attendance is only marked in foreground -->
 
@@ -91,12 +49,6 @@
         <activity android:name=".ui.ScanQRActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
-        <activity android:name=".ui.SubjectAttendanceActivity"
-            android:exported="false" />
-        <activity android:name=".ui.JoinClassActivity"
-            android:exported="false" />
-        <activity android:name=".ui.LeaveApplicationActivity"
-            android:exported="false" />
 
         <!-- Teacher -->
         <activity android:name=".ui.TeacherDashboardActivity"
@@ -109,12 +61,7 @@
             android:keepScreenOn="true" />
         <activity android:name=".ui.SessionAttendanceActivity"
             android:exported="false" />
-        <activity android:name=".ui.ClassSessionsActivity"
-            android:exported="false" />
-        <activity android:name=".ui.TimetableActivity"
-            android:exported="false" />
-        <activity android:name=".ui.LeaveApplicationsActivity"
-            android:exported="false" />
+
 
 
         <!-- Shared -->
@@ -134,32 +81,6 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
-
-        <!-- Timetable: weekly alarm receiver -->
-        <receiver
-            android:name=".timetable.TimetableAlarmReceiver"
-            android:exported="false" />
-
-        <!-- Timetable: re-register alarms after device reboot -->
-        <receiver
-            android:name=".timetable.BootReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
-            </intent-filter>
-        </receiver>
-
-        <!-- FileProvider — for sharing CSV exports via content:// URIs -->
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="com.qrattend.app.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
-        </provider>
 
     </application>
 

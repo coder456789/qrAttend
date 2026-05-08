@@ -13,25 +13,22 @@
 -keepattributes InnerClasses
 -keepattributes EnclosingMethod
 
-# =============================================================================
 # FIREBASE — Core
 # Prevents Firebase SDK internals from being stripped or renamed.
-# =============================================================================
+
 -keep class com.google.firebase.** { *; }
 -keep interface com.google.firebase.** { *; }
 -dontwarn com.google.firebase.**
 
-# =============================================================================
 # FIREBASE AUTH
-# =============================================================================
+
 -keep class com.google.firebase.auth.** { *; }
 -dontwarn com.google.firebase.auth.**
 
-# =============================================================================
 # FIREBASE FIRESTORE
 # Firestore uses reflection to deserialize documents into POJOs.
 # Field names MUST be preserved exactly as declared.
-# =============================================================================
+
 -keep class com.google.firebase.firestore.** { *; }
 -dontwarn com.google.firebase.firestore.**
 
@@ -43,65 +40,64 @@
     public <methods>;         # All getters/setters
 }
 
-# =============================================================================
+
 # FIREBASE CLOUD MESSAGING (FCM)
-# =============================================================================
+
 -keep class com.google.firebase.messaging.** { *; }
 -dontwarn com.google.firebase.messaging.**
 
 # Keep our custom FCM service
 -keep class com.qrattend.app.firebase.FCMService { *; }
 
-# =============================================================================
+
 # FIREBASE CRASHLYTICS
-# =============================================================================
+
 -keep class com.google.firebase.crashlytics.** { *; }
 -dontwarn com.google.firebase.crashlytics.**
 -keepattributes *Annotation*
 
-# =============================================================================
+
 # FIREBASE ANALYTICS
-# =============================================================================
+
 -keep class com.google.firebase.analytics.** { *; }
 -dontwarn com.google.firebase.analytics.**
 
-# =============================================================================
+
 # GOOGLE PLAY SERVICES (used by Firebase internally)
-# =============================================================================
+
 -keep class com.google.android.gms.** { *; }
 -keep interface com.google.android.gms.** { *; }
 -dontwarn com.google.android.gms.**
 
-# =============================================================================
+
 # APP AUTH MANAGER
 # Keeps inner classes (SessionInfo, UserRecord, AuthException, TokenManager)
-# =============================================================================
+
 -keep class com.qrattend.app.firebase.AuthManager { *; }
 -keep class com.qrattend.app.firebase.AuthManager$* { *; }
 
-# =============================================================================
+
 # ZXING (QR Code scanning)
-# =============================================================================
+
 -keep class com.journeyapps.** { *; }
 -keep class com.google.zxing.** { *; }
 -dontwarn com.journeyapps.**
 -dontwarn com.google.zxing.**
 
-# =============================================================================
 # ML KIT (Barcode scanning)
-# =============================================================================
+
 -keep class com.google.mlkit.** { *; }
 -dontwarn com.google.mlkit.**
 
-# =============================================================================
+
 # CAMERAX
-# =============================================================================
+
 -keep class androidx.camera.** { *; }
 -dontwarn androidx.camera.**
 
-# =============================================================================
+
 # ANDROID / ANDROIDX — General safety rules
-# =============================================================================
+
 -keep class androidx.** { *; }
 -keep interface androidx.** { *; }
 -dontwarn androidx.**
@@ -128,9 +124,9 @@
     public static <fields>;
 }
 
-# =============================================================================
+
 # SUPPRESS COMMON WARNINGS
-# =============================================================================
+
 -dontwarn org.xmlpull.v1.**
 -dontwarn javax.annotation.**
 -dontwarn sun.misc.**

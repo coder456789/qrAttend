@@ -5,8 +5,8 @@ import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.ProgressBar;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
@@ -20,23 +20,24 @@ import com.qrattend.app.data.model.AttendanceRecord;
 import com.qrattend.app.data.repository.AttendanceRepository;
 import com.qrattend.app.data.repository.StudentRepository;
 import com.qrattend.app.firebase.AuthManager;
-import com.qrattend.app.ui.adapters.AttendanceRecordAdapter;
+import com.qrattend.app.ui.adapters.SubjectGroupAdapter;
 import com.qrattend.app.utils.Constants;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 public class StudentDashboardActivity extends AppCompatActivity {
 
-    private TextView tvAttendancePercent, tvEmptySubjects;
-    private RecyclerView rvSubjects;
+    private TextView             tvAttendancePercent, tvEmptySubjects;
+    private ProgressBar          progressAttendance;
+    private RecyclerView         rvSubjects;
     private ExtendedFloatingActionButton fabScanQR;
-    private AttendanceRecordAdapter adapter;
+    private SubjectGroupAdapter  adapter;
 
-    private AuthManager authManager;
-    private StudentRepository studentRepo;
+    private AuthManager         authManager;
+    private StudentRepository   studentRepo;
     private AttendanceRepository attendanceRepo;
 
     @Override
@@ -48,15 +49,21 @@ public class StudentDashboardActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
 
         tvAttendancePercent = findViewById(R.id.tvAttendancePercent);
-        tvEmptySubjects = findViewById(R.id.tvEmptySubjects);
-        rvSubjects = findViewById(R.id.rvSubjects);
-        fabScanQR = findViewById(R.id.fabScanQR);
+        tvEmptySubjects     = findViewById(R.id.tvEmptySubjects);
+        progressAttendance  = findViewById(R.id.progressAttendance);
+        rvSubjects          = findViewById(R.id.rvSubjects);
+        fabScanQR           = findViewById(R.id.fabScanQR);
 
-        authManager = new AuthManager();
-        studentRepo = new StudentRepository();
+        authManager    = new AuthManager();
+        studentRepo    = new StudentRepository();
         attendanceRepo = new AttendanceRepository();
 
-        adapter = new AttendanceRecordAdapter();
+        // Adapter — tapping a subject opens SubjectAttendanceActivity
+        adapter = new SubjectGroupAdapter(subject -> {
+            Intent intent = new Intent(this, SubjectAttendanceActivity.class);
+            intent.putExtra("subject_name", subject.subjectName);
+            startActivity(intent);
+        });
         rvSubjects.setLayoutManager(new LinearLayoutManager(this));
         rvSubjects.setAdapter(adapter);
 
@@ -91,50 +98,83 @@ public class StudentDashboardActivity extends AppCompatActivity {
         String uid = authManager.getCurrentUserId();
         if (uid == null) return;
 
-        // Load student name for toolbar
+        // Toolbar title
         studentRepo.getStudent(uid, student -> {
             if (student != null && student.getName() != null) {
                 if (getSupportActionBar() != null) {
-                    getSupportActionBar().setTitle(getString(R.string.welcome_student, student.getName()));
+                    getSupportActionBar().setTitle(
+                            getString(R.string.welcome_student, student.getName()));
                 }
             }
         });
 
-        // Load attendance history
+        // Attendance history → grouped by subject
         attendanceRepo.getStudentHistory(uid, records -> {
-            if (records == null || records.isEmpty()) {
-                tvAttendancePercent.setText(getString(R.string.attendance_percentage, 0));
-                tvAttendancePercent.setTextColor(ContextCompat.getColor(this, R.color.attendanceLow));
-                tvEmptySubjects.setVisibility(View.VISIBLE);
-                rvSubjects.setVisibility(View.GONE);
-                return;
-            }
-
-            // Compute overall attendance
-            int total = records.size();
-            int present = 0;
-            for (AttendanceRecord r : records) {
-                if (Constants.STATUS_PRESENT.equals(r.getStatus())) {
-                    present++;
+            runOnUiThread(() -> {
+                if (records == null || records.isEmpty()) {
+                    tvAttendancePercent.setText(getString(R.string.attendance_percentage, 0));
+                    tvAttendancePercent.setTextColor(
+                            ContextCompat.getColor(this, R.color.attendanceLow));
+                    progressAttendance.setProgress(0);
+                    tvEmptySubjects.setVisibility(View.VISIBLE);
+                    rvSubjects.setVisibility(View.GONE);
+                    return;
                 }
-            }
-            int percent = total > 0 ? (present * 100) / total : 0;
-            tvAttendancePercent.setText(getString(R.string.attendance_percentage, percent));
 
-            // Color code
-            if (percent >= 75) {
-                tvAttendancePercent.setTextColor(ContextCompat.getColor(this, R.color.attendanceHigh));
-            } else if (percent >= 60) {
-                tvAttendancePercent.setTextColor(ContextCompat.getColor(this, R.color.attendanceMid));
-            } else {
-                tvAttendancePercent.setTextColor(ContextCompat.getColor(this, R.color.attendanceLow));
-            }
+                // ── Overall attendance ────────────────────────────────────
+                int total   = records.size();
+                int present = countPresent(records);
+                int pct     = total > 0 ? (present * 100) / total : 0;
 
-            // Show subject-wise breakdown (grouped by sessionId as proxy for class)
-            tvEmptySubjects.setVisibility(View.GONE);
-            rvSubjects.setVisibility(View.VISIBLE);
-            adapter.updateList(records);
+                tvAttendancePercent.setText(getString(R.string.attendance_percentage, pct));
+                progressAttendance.setProgress(pct);
+                int overallColor = pct >= 75 ? R.color.attendanceHigh
+                        : pct >= 60 ? R.color.attendanceMid : R.color.attendanceLow;
+                tvAttendancePercent.setTextColor(
+                        ContextCompat.getColor(this, overallColor));
+
+                // ── Group by subject ──────────────────────────────────────
+                // LinkedHashMap preserves insertion order for deterministic ordering
+                Map<String, int[]> subjectMap = new LinkedHashMap<>();
+                for (AttendanceRecord r : records) {
+                    String subject = r.getSubject();
+                    if (subject == null || subject.isEmpty()) {
+                        subject = "Other";   // fallback for older records
+                    }
+                    int[] counts = subjectMap.getOrDefault(subject, new int[]{0, 0});
+                    counts[1]++; // total
+                    if (isPresent(r)) counts[0]++; // present
+                    subjectMap.put(subject, counts);
+                }
+
+                List<SubjectGroupAdapter.SubjectGroup> groups = new ArrayList<>();
+                for (Map.Entry<String, int[]> entry : subjectMap.entrySet()) {
+                    groups.add(new SubjectGroupAdapter.SubjectGroup(
+                            entry.getKey(),
+                            entry.getValue()[0],  // presentCount
+                            entry.getValue()[1]   // totalCount
+                    ));
+                }
+
+                // Sort by subject name alphabetically for a consistent order
+                groups.sort((a, b) -> a.subjectName.compareToIgnoreCase(b.subjectName));
+
+                tvEmptySubjects.setVisibility(View.GONE);
+                rvSubjects.setVisibility(View.VISIBLE);
+                adapter.updateList(groups);
+            });
         });
+    }
+
+    private int countPresent(List<AttendanceRecord> records) {
+        int n = 0;
+        for (AttendanceRecord r : records) if (isPresent(r)) n++;
+        return n;
+    }
+
+    private boolean isPresent(AttendanceRecord r) {
+        return Constants.STATUS_PRESENT.equals(r.getStatus())
+                || "Present".equals(r.getStatus());
     }
 
     @Override

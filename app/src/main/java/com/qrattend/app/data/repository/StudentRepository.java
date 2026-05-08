@@ -45,6 +45,28 @@ public class StudentRepository {
                 });
     }
 
+    /**
+     * Looks up a student by PRN / roll number.
+     * Returns an {@link android.util.Pair} of (docId, Student), or {@code null} if not found.
+     */
+    public void getStudentByRollNo(@NonNull String rollNo,
+                                   @NonNull OnSuccessListener<android.util.Pair<String, Student>> callback) {
+        studentsRef.whereEqualTo("rollNo", rollNo)
+                .limit(1)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    if (!querySnapshot.isEmpty()) {
+                        com.google.firebase.firestore.DocumentSnapshot doc =
+                                querySnapshot.getDocuments().get(0);
+                        Student s = doc.toObject(Student.class);
+                        callback.onSuccess(new android.util.Pair<>(doc.getId(), s));
+                    } else {
+                        callback.onSuccess(null);
+                    }
+                })
+                .addOnFailureListener(e -> callback.onSuccess(null));
+    }
+
     public void getAllStudents(@NonNull OnSuccessListener<List<Student>> callback) {
         studentsRef.get()
                 .addOnSuccessListener(querySnapshot -> {
@@ -86,8 +108,16 @@ public class StudentRepository {
     }
 
     /**
-     * Registers a new device for the student, supporting up to Constants.MAX_DEVICES.
-     * This is a safer way to handle device registration than just overwriting 'deviceId'.
+     * Registers the device fingerprint for a student (single-device binding).
+     * <p>
+     * Rules (MAX_DEVICES = 1):
+     * <ul>
+     *   <li>If no device is bound yet, store the fingerprint as {@code deviceId}.</li>
+     *   <li>If the same device is already bound, this is a no-op (idempotent).</li>
+     *   <li>If a DIFFERENT device is already bound, do NOT overwrite — the scan
+     *       will be rejected at the validation layer (device_mismatch).</li>
+     * </ul>
+     * Always fires the callback so the scan flow can proceed to validation.
      */
     public void registerDevice(@NonNull String studentId,
                                @NonNull String newDeviceId,
@@ -101,25 +131,52 @@ public class StudentRepository {
                 return;
             }
 
-            Map<String, Object> updates = new HashMap<>();
-            if (student.getDeviceId() == null || student.getDeviceId().isEmpty()
-                    || student.getDeviceId().equals(newDeviceId)) {
+            String currentDeviceId = student.getDeviceId();
+            if (currentDeviceId == null || currentDeviceId.isEmpty()
+                    || currentDeviceId.equals(newDeviceId)) {
+                // No device bound yet, or same device — bind / confirm
+                Map<String, Object> updates = new HashMap<>();
                 updates.put("deviceId", newDeviceId);
-            } else if (student.getDeviceId2() == null || student.getDeviceId2().isEmpty()
-                    || student.getDeviceId2().equals(newDeviceId)) {
-                updates.put("deviceId2", newDeviceId);
-            }
-            // If both slots are already filled with different devices, still fire callback
-            // so the scan flow continues to the validation/rejection step.
-
-            if (!updates.isEmpty()) {
                 updateStudent(studentId, updates, callback);
             } else {
-                // No update needed — fire callback immediately so flow continues
+                // A DIFFERENT device is already bound — do not overwrite.
+                // The validation layer will issue a device_mismatch rejection.
                 callback.onComplete(com.google.android.gms.tasks.Tasks.forResult(null));
             }
         });
     }
+
+    /**
+     * Student self-service device unbind.
+     * Clears {@code deviceId} and {@code deviceId2} using {@code FieldValue.delete()}.
+     * <p>
+     * NOTE: The 30-day rate-limit timestamp ({@code lastUnbindDate}) is stored in
+     * SharedPreferences by {@code SettingsActivity}, NOT in Firestore, so this
+     * update only touches fields already covered by the deployed security rule:
+     * {@code ['deviceId', 'deviceId2', 'fcmToken']}.
+     * </p>
+     */
+    public void unbindDevice(@NonNull String studentId,
+                             @NonNull OnCompleteListener<Void> callback) {
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("deviceId",  com.google.firebase.firestore.FieldValue.delete());
+        updates.put("deviceId2", com.google.firebase.firestore.FieldValue.delete());
+
+        studentsRef.document(studentId)
+                .update(updates)
+                .addOnCompleteListener(callback);
+    }
+
+    /**
+     * Teacher-initiated device unbind — same as above but callable without the
+     * student self-service rate-limit check.
+     */
+    public void unbindDeviceByTeacher(@NonNull String studentId,
+                                      @NonNull OnCompleteListener<Void> callback) {
+        // Reuses the same logic; teachers bypass the rate limit in SettingsActivity.
+        unbindDevice(studentId, callback);
+    }
+
 
     // ── Delete ──────────────────────────────────────────────────────────
 

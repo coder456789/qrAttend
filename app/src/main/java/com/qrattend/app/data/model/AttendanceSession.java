@@ -71,6 +71,12 @@ public class AttendanceSession {
     /** Timestamp when the session ended; {@code null} while the session is active. */
     private Timestamp endTime;
 
+    /** Teacher-specified lecture start time (e.g. 10:00 AM), for record-keeping. */
+    private Timestamp lectureStartTime;
+
+    /** Teacher-specified lecture end time (e.g. 11:00 AM), for record-keeping. */
+    private Timestamp lectureEndTime;
+
     /** Whether the session is currently accepting attendance check-ins. */
     private boolean active;
 
@@ -149,6 +155,12 @@ public class AttendanceSession {
 
     public Timestamp getEndTime() { return endTime; }
     public void setEndTime(Timestamp endTime) { this.endTime = endTime; }
+
+    public Timestamp getLectureStartTime() { return lectureStartTime; }
+    public void setLectureStartTime(Timestamp lectureStartTime) { this.lectureStartTime = lectureStartTime; }
+
+    public Timestamp getLectureEndTime() { return lectureEndTime; }
+    public void setLectureEndTime(Timestamp lectureEndTime) { this.lectureEndTime = lectureEndTime; }
 
     public int getDurationMinutes() { return durationMinutes; }
     public void setDurationMinutes(int durationMinutes) { this.durationMinutes = durationMinutes; }

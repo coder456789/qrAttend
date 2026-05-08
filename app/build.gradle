@@ -4,6 +4,12 @@ plugins {
     id 'com.google.firebase.crashlytics'
 }
 
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
 android {
     namespace 'com.qrattend.app'
     compileSdk 35

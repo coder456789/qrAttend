@@ -83,6 +83,7 @@ public class QRScannerUtil {
     private final ExecutorService cameraExecutor = Executors.newSingleThreadExecutor();
     private       BarcodeScanner  barcodeScanner;
     private       boolean         scanHandled    = false;
+    private       androidx.camera.core.Camera camera;
 
     // -----------------------------------------------------------------------
     // Constructor
@@ -94,6 +95,11 @@ public class QRScannerUtil {
         this.previewView    = previewView;
         this.lifecycleOwner = lifecycleOwner;
         this.sessionKey     = sessionKey;
+    }
+
+    /** Returns the bound Camera instance (available after startScanning). */
+    public androidx.camera.core.Camera getCamera() {
+        return camera;
     }
 
     // -----------------------------------------------------------------------
@@ -130,7 +136,7 @@ public class QRScannerUtil {
         analysis.setAnalyzer(cameraExecutor, ip -> analyzeFrame(ip, callback));
 
         cameraProvider.unbindAll();
-        cameraProvider.bindToLifecycle(lifecycleOwner,
+        camera = cameraProvider.bindToLifecycle(lifecycleOwner,
                 CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis);
     }
 

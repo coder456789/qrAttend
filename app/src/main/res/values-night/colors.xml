@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ═══════════════════════════════════════════════════════════════
+         Dark Mode Palette — Black & Grey
+         ═══════════════════════════════════════════════════════════════ -->
+
+    <!-- Primary — keep the blue accent for brand identity -->
+    <color name="primary">#4E90FF</color>
+    <color name="primaryDark">#1A5FCC</color>
+    <color name="primaryLight">#82B1FF</color>
+    <color name="primaryContainer">#1A5FCC</color>
+    <color name="onPrimary">#FFFFFF</color>
+    <color name="onPrimaryContainer">#FFFFFF</color>
+
+    <!-- Secondary -->
+    <color name="secondary">#82B1FF</color>
+    <color name="secondaryContainer">#1A3A6E</color>
+    <color name="onSecondary">#000000</color>
+    <color name="onSecondaryContainer">#AECBFF</color>
+
+    <!-- Tertiary -->
+    <color name="tertiary">#FFAB40</color>
+    <color name="tertiaryContainer">#7A3D00</color>
+
+    <!-- Accent -->
+    <color name="accent">#4E90FF</color>
+
+    <!-- Status -->
+    <color name="success">#4CAF50</color>
+    <color name="error">#FF5252</color>
+    <color name="errorContainer">#7A1010</color>
+    <color name="warning">#FFAB40</color>
+
+    <!-- Text Colors — light on dark -->
+    <color name="textPrimary">#E8EAED</color>
+    <color name="textSecondary">#9AA0A6</color>
+    <color name="textOnPrimary">#FFFFFF</color>
+    <color name="textHint">#5F6368</color>
+
+    <!-- Surface / Background — true black + dark greys -->
+    <color name="background">#000000</color>
+    <color name="surface">#0D0D0D</color>
+    <color name="surfaceContainerLowest">#111111</color>
+    <color name="surfaceContainerLow">#1A1A1A</color>
+    <color name="surfaceContainer">#222222</color>
+    <color name="surfaceContainerHigh">#2C2C2C</color>
+    <color name="surfaceVariant">#303030</color>
+    <color name="outline">#5F6368</color>
+    <color name="outlineVariant">#3C3C3C</color>
+    <color name="divider">#2C2C2C</color>
+
+    <!-- Attendance Status -->
+    <color name="statusPresent">#4CAF50</color>
+    <color name="statusPresentBg">#1B3A1C</color>
+    <color name="statusRejected">#FF5252</color>
+    <color name="statusRejectedBg">#3A1B1B</color>
+
+    <!-- Attendance Thresholds -->
+    <color name="attendanceHigh">#4CAF50</color>
+    <color name="attendanceMid">#FFAB40</color>
+    <color name="attendanceLow">#FF5252</color>
+
+    <!-- Splash gradient stays dark blue -->
+    <color name="splashStart">#001A41</color>
+    <color name="splashEnd">#003380</color>
+
+    <!-- Misc -->
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="chipBackground">#1A3A6E</color>
+    <color name="chipText">#82B1FF</color>
+    <color name="cardStroke">#3C3C3C</color>
+    <color name="overlay">#CC000000</color>
+    <color name="scannerBackground">#000000</color>
+    <color name="qrDisplayBackground">#000000</color>
+    <color name="avatarBackground">#1A3A6E</color>
+    <color name="avatarText">#82B1FF</color>
+
+    <!-- Card Tints -->
+    <color name="cardScanQr">#1A3A6E</color>
+    <color name="cardHistory">#1A3A6E</color>
+    <color name="cardSettings">#1A1A1A</color>
+
+    <!-- Gradient headers — darker blue for dark mode -->
+    <color name="headerGradientStart">#001A41</color>
+    <color name="headerGradientEnd">#003380</color>
+</resources>

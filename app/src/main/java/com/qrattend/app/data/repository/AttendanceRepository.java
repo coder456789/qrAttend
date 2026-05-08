@@ -58,16 +58,36 @@ public class AttendanceRepository {
     public void manuallyMarkPresent(@NonNull String sessionId,
                                     @NonNull String studentId,
                                     @NonNull OnCompleteListener<Void> listener) {
-        // Use your helper method getRecordsRef to reach the subcollection
+        manuallyMarkWithStatus(sessionId, studentId, "Present", null, null, null, listener);
+    }
+
+    /**
+     * Teacher manual attendance override — sets any status (Present / Absent / Leave).
+     * Creates the record if it doesn't exist (uses set+merge so existing data is kept).
+     */
+    public void manuallyMarkWithStatus(@NonNull String sessionId,
+                                       @NonNull String studentId,
+                                       @NonNull String status,
+                                       String studentName,
+                                       String rollNo,
+                                       String subject,
+                                       @NonNull OnCompleteListener<Void> listener) {
+        java.util.Map<String, Object> data = new java.util.HashMap<>();
+        data.put("status",        status);
+        data.put("studentId",     studentId);
+        data.put("sessionId",     sessionId);
+        data.put("markedManually", true);
+        data.put("time",          com.google.firebase.Timestamp.now());
+        if (studentName != null) data.put("studentName",   studentName);
+        if (rollNo      != null) data.put("studentRollNo", rollNo);
+        if (subject     != null) data.put("subject",       subject);
+
         getRecordsRef(sessionId)
                 .document(studentId)
-                .set(new HashMap<String, Object>() {{
-                    put("status", "Present");
-                    put("markedManually", true);
-                    put("timestamp", com.google.firebase.Timestamp.now());
-                }}, com.google.firebase.firestore.SetOptions.merge())
+                .set(data, com.google.firebase.firestore.SetOptions.merge())
                 .addOnCompleteListener(listener);
     }
+
     // ── Read ────────────────────────────────────────────────────────────
 
     /**
@@ -84,6 +104,7 @@ public class AttendanceRepository {
 
     /**
      * Retrieves all attendance records for a given session (Teacher View).
+     * One-time fetch — use listenToSessionRecords for live updates.
      */
     public void getSessionRecords(@NonNull String sessionId,
                                   @NonNull OnSuccessListener<List<AttendanceRecord>> callback) {
@@ -100,6 +121,27 @@ public class AttendanceRepository {
                     callback.onSuccess(records);
                 });
     }
+
+    /**
+     * Attaches a real-time snapshot listener to the session's records subcollection.
+     * The callback fires immediately with existing data, and again whenever any record
+     * is added, modified, or deleted. Call {@code ListenerRegistration.remove()} in onStop().
+     */
+    public com.google.firebase.firestore.ListenerRegistration listenToSessionRecords(
+            @NonNull String sessionId,
+            @NonNull OnSuccessListener<List<AttendanceRecord>> callback) {
+        return getRecordsRef(sessionId)
+                .addSnapshotListener((querySnapshot, error) -> {
+                    if (error != null || querySnapshot == null) return;
+                    List<AttendanceRecord> records = new ArrayList<>();
+                    for (DocumentSnapshot doc : querySnapshot.getDocuments()) {
+                        AttendanceRecord r = doc.toObject(AttendanceRecord.class);
+                        if (r != null) records.add(r);
+                    }
+                    callback.onSuccess(records);
+                });
+    }
+
 
     /**
      * Retrieves a student's attendance history across all sessions (Student History).
