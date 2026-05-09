@@ -1,333 +1,432 @@
-<div align="center">
+# QR-Attend 📱
 
-# 📱 QR-Attend
+> **Smart Attendance, Zero Proxy**
 
-### Dynamic QR Code Attendance System with Multi-Layer Proxy Prevention
-
-[![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?logo=android&logoColor=white)](https://developer.android.com)
-[![Language](https://img.shields.io/badge/Language-Java-ED8B00?logo=openjdk&logoColor=white)](https://www.java.com)
-[![Firebase](https://img.shields.io/badge/Backend-Firebase-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com)
-[![Min SDK](https://img.shields.io/badge/Min%20SDK-API%2026%20(Android%208.0)-blue)](https://developer.android.com/tools/releases/platforms)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
-
-*Eliminating proxy attendance through device fingerprinting, GPS geofencing, and rotating encrypted QR codes.*
-
-</div>
+A secure, QR-code-based student attendance system for Android that prevents proxy attendance through multi-layer security: AES-256-GCM encrypted rotating QR codes, GPS geofencing, and hardware device fingerprinting.
 
 ---
 
-## 📖 Table of Contents
+## Table of Contents
 
-- [Overview](#overview)
-- [Problem Statement](#problem-statement)
-- [Key Features](#key-features)
-- [How It Works](#how-it-works)
-- [Architecture](#architecture)
+- [Features](#features)
+- [Security Architecture](#security-architecture)
 - [Tech Stack](#tech-stack)
-- [Firestore Data Model](#firestore-data-model)
 - [Project Structure](#project-structure)
-- [Security & Proxy Prevention](#security--proxy-prevention)
-- [Screenshots / Flow](#screenshots--flow)
+- [Database Schema](#database-schema)
 - [Setup & Installation](#setup--installation)
+- [Usage](#usage)
 - [Team](#team)
 
 ---
 
-## Overview
+## Features
 
-**QR-Attend** is an Android application that automates student attendance using **dynamic QR codes that rotate every 10 seconds**. The system combines device fingerprinting, GPS geofencing, and time-bound encrypted tokens to make proxy attendance virtually impossible.
+### Student
+- 📷 **Scan QR** — Scan the teacher's live QR code to mark attendance
+- 📊 **Attendance Dashboard** — View overall % and subject-wise breakdown with a donut chart
+- 📅 **Attendance History** — Full log filterable by Present / Absent / Rejected / Leave
+- 📝 **Apply for Leave** — Submit leave requests to a specific teacher with optional file attachment (PDF/image)
+- 📋 **My Leaves** — Track status of all leave applications (Pending / Approved / Rejected)
+- 🔗 **Join Class** — Enter a 6-character code to enroll in a class
+- 🔒 **Device Binding** — One account = one device; rate-limited unbind (once per 30 days)
 
-| Metric | Target |
-|---|---|
-| Proxy detection rate | ≥ 98% |
-| Attendance marking time | < 5 seconds per student |
-| Data accuracy vs manual | < 1% discrepancy |
-| Min Android version | Android 8.0 (API 26) |
+### Teacher
+- 🟢 **Start Session** — Select class, pick duration, capture GPS location, generate session
+- 📺 **Display QR** — Full-screen rotating QR code that refreshes every 10 seconds
+- 👥 **Session Attendance** — Live list of all students who scanned, with status
+- 📋 **Leave Applications** — Review, approve, or reject student leave requests with attachment viewing
+- 🗓️ **Timetable** — Manage weekly class schedule with alarm-based reminders
+- 📤 **Export CSV** — Export session attendance records
 
----
-
-## Problem Statement
-
-| Pain Point | Impact |
-|---|---|
-| Manual roll-call is slow and error-prone | Wastes 5–10 min per lecture |
-| Buddy-punching / proxy attendance | Inflated records, unfair grading |
-| Paper registers are hard to audit | No analytics or real-time alerts |
-| No visibility for absent students | Delayed intervention |
-
----
-
-## Key Features
-
-### 👨‍🏫 Teacher Side
-- **Start attendance sessions** — select class, get GPS location, generate session
-- **Full-screen dynamic QR code** — rotates every 10 seconds automatically
-- **Real-time attendance count** — live updates as students scan in
-- **Manual override** — long-press any student to mark Present / Absent / Leave
-- **Session history** — view past sessions with date, count, and per-student detail
-- **Leave application management** — approve/reject student leave with attachment viewing
-- **Join code display** — class join codes shown on teacher dashboard cards
-
-### 👩‍🎓 Student Side
-- **QR scanner** — scan teacher's QR code to mark attendance in under 5 seconds
-- **Auto-enrollment** — automatically added to a class on first valid scan
-- **Attendance donut chart** — animated colour-coded ring (🟢 ≥75%, 🟡 ≥60%, 🔴 <60%) on dashboard
-- **Subject-wise breakdown** — individual attendance % per subject
-- **Attendance history** — filterable log with date, status, rejection reasons
-- **Leave applications** — submit with class/teacher/date selection and file attachment (PDF/image)
-- **My Leaves** — view all past applications with Approved / Rejected / Pending status
-
-### 🔒 Security / Anti-Proxy
-- **Device fingerprinting** — attendance bound to registered device (max 2 devices per student)
-- **GPS geofencing** — 50 m radius around classroom, mock location detection
-- **Rotating encrypted QR** — AES-256-GCM payload, 10-second nonce, one-time-use per student
-- **Emulator / root detection** — auto-rejected
-- **Auto-absent marking** — enrolled-but-absent students auto-marked when session ends
+### Security
+- 🔐 AES-256-GCM encrypted QR payloads with 10-second nonce rotation
+- 📍 GPS geofencing (100m default radius) to ensure physical presence
+- 📱 Hardware device fingerprinting to prevent account sharing
+- 🛡️ Mock location detection
+- ⏱️ 6-second nonce grace window prevents false rejection during GPS collection
 
 ---
 
-## How It Works
-
-### Teacher starts a session
+## Security Architecture
 
 ```
-Teacher App
-┌─────────────────────────────────────────────────────────┐
-│  1. Select class → 2. Get GPS location                  │
-│  3. Create session in Firestore                         │
-│  4. Generate AES-256 key for this session               │
-│  5. Display full-screen QR code                         │
-│  ┌─────────────┐   every 10s    ┌────────────────────┐  │
-│  │ QRRefreshMgr│─────────────▶  │ New nonce → encrypt │  │
-│  │             │◀───────────── │ → render QR → Upd.  │  │
-│  └─────────────┘   Firestore   └────────────────────┘  │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                    ANTI-PROXY LAYERS                        │
+├──────────────────────┬──────────────────────────────────────┤
+│  Layer 1: QR Crypto  │  AES-256-GCM encrypted payload       │
+│                      │  Nonce rotates every 10 seconds       │
+│                      │  Session key stored server-side       │
+├──────────────────────┼──────────────────────────────────────┤
+│  Layer 2: Geofence   │  Student GPS must be within 100m of  │
+│                      │  teacher's recorded classroom coords  │
+│                      │  Mock location detection enabled      │
+├──────────────────────┼──────────────────────────────────────┤
+│  Layer 3: Device FP  │  SHA-256 hardware fingerprint bound   │
+│                      │  to Firebase UID on first scan        │
+│                      │  One device per account enforced      │
+└──────────────────────┴──────────────────────────────────────┘
 ```
-
-### Student marks attendance
-
-```
-Student scans QR
-       │
-       ▼
-Decrypt AES payload → extract sessionId + nonce
-       │
-       ├── ❌ Nonce expired (> 10s)          → Rejected: QR Expired
-       ├── ❌ Device fingerprint mismatch    → Rejected: Device Mismatch  
-       ├── ❌ GPS outside 50 m geofence      → Rejected: Location Mismatch
-       ├── ❌ Mock/fake GPS detected          → Rejected: Mock Location
-       ├── ❌ Rooted / emulator device        → Rejected: Device Not Trusted
-       │
-       └── ✅ All checks pass → Write attendance record to Firestore
-```
-
----
-
-## Architecture
-
-```mermaid
-graph TD
-    A[Student App\nJava · Android] -->|Firebase SDK| B[Firebase Auth]
-    C[Teacher App\nJava · Android] -->|Firebase SDK| B
-    A -->|Read/Write| D[(Cloud Firestore)]
-    C -->|Read/Write| D
-    D -->|Security Rules| E[Firestore Rules\nRole-based access]
-    A -->|File upload| F[Firebase Storage\nLeave attachments]
-    D -->|FCM token| G[Firebase Cloud Messaging\nPush notifications]
-```
-
-> **Serverless architecture** — no custom backend. All logic runs client-side with Firebase as the data layer.
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
+| Category | Technology |
 |---|---|
-| **Language / IDE** | Java 17 · Android Studio |
-| **UI** | XML Layouts · Material Design 3 Components |
-| **Authentication** | Firebase Authentication (Email/Password + Google Sign-In) |
-| **Database** | Cloud Firestore (real-time sync, subcollection model) |
-| **File Storage** | Firebase Storage + Base64 Firestore fallback |
-| **Push Notifications** | Firebase Cloud Messaging (FCM) |
-| **QR Generation** | ZXing `zxing-android-embedded:4.3.0` |
-| **QR Scanning** | Google ML Kit Barcode Scanning `17.3.0` |
-| **Camera** | CameraX `1.3.1` |
-| **Location** | Google Play Services Fused Location Provider `21.1.0` |
-| **Encryption** | AES-256-GCM (`javax.crypto`) |
-| **Analytics / Crashes** | Firebase Analytics + Crashlytics |
-| **Min / Target SDK** | API 26 / API 35 |
-| **Build** | Gradle · AGP |
-
----
-
-## Firestore Data Model
-
-```
-Firestore Root
-│
-├── students/{studentId}
-│   ├── name, rollNo, className, email, phone
-│   ├── deviceId          # primary device fingerprint hash
-│   ├── deviceId2         # optional 2nd device
-│   └── fcmToken
-│
-├── teachers/{teacherId}
-│   ├── name, email, subject, classroom
-│   └── fcmToken
-│
-├── classes/{classId}
-│   ├── className, subject, teacherId, joinCode
-│   └── enrolledStudents: [studentId, ...]   # arrayUnion, idempotent
-│
-├── attendanceSessions/{sessionId}
-│   ├── classId, teacherId, qrCode (current nonce)
-│   ├── latitude, longitude, geofenceRadius (meters)
-│   ├── startTime, endTime, active
-│   │
-│   └── records/{studentId}                  # subcollection
-│       ├── status: "Present" | "Absent" | "Leave" | "Rejected"
-│       ├── time, deviceId
-│       ├── deviceLocationLat, deviceLocationLong
-│       └── rejectionReason
-│
-└── leaveApplications/{applicationId}
-    ├── studentId, studentName, studentRollNo
-    ├── classId, className, subject
-    ├── teacherId, teacherName
-    ├── reason, leaveDate, submittedAt
-    ├── status: "Pending" | "Approved" | "Rejected"
-    ├── attachmentUrl          # Firebase Storage download URL (if upload succeeded)
-    └── attachmentBase64       # Base64 fallback (if Storage rules block upload)
-```
-
-> **Why subcollections for records?**  
-> Using `studentId` as the document ID prevents duplicate attendance — Firestore enforces unique document IDs automatically. No composite index needed.
+| Language | Java (Android SDK) |
+| Min SDK | Android 8.0 (API 26) |
+| Target SDK | Android 14 (API 34) |
+| Database | Firebase Firestore (NoSQL) |
+| Auth | Firebase Authentication |
+| Storage | Firebase Storage |
+| Messaging | Firebase Cloud Messaging (FCM) |
+| QR Generation | ZXing (`core` + `android-integration`) |
+| QR Scanning | Google ML Kit Barcode Scanning |
+| Camera | CameraX (androidx.camera) |
+| Location | Google Play Services — Fused Location Provider |
+| UI | Material Design 3 (MaterialComponents) |
+| Charts | Custom `AttendanceDonutView` (Canvas drawing) |
 
 ---
 
 ## Project Structure
 
 ```
-app/src/main/java/com/qrattend/app/
-│
-├── ui/                              # All screens (Activities)
-│   ├── SplashActivity.java          # Launch router (login vs dashboard)
-│   ├── LoginActivity.java
-│   ├── SignupActivity.java
+qrAttend/
+├── app/
+│   ├── src/main/
+│   │   ├── AndroidManifest.xml
+│   │   ├── java/com/qrattend/app/
+│   │   │   │
+│   │   │   ├── data/
+│   │   │   │   ├── model/                    ← Firestore data models
+│   │   │   │   │   ├── Student.java
+│   │   │   │   │   ├── Teacher.java
+│   │   │   │   │   ├── ClassInfo.java
+│   │   │   │   │   ├── AttendanceSession.java
+│   │   │   │   │   ├── AttendanceRecord.java
+│   │   │   │   │   ├── LeaveApplication.java
+│   │   │   │   │   └── TimetableEntry.java
+│   │   │   │   │
+│   │   │   │   └── repository/               ← Firestore CRUD operations
+│   │   │   │       ├── StudentRepository.java
+│   │   │   │       ├── TeacherRepository.java
+│   │   │   │       ├── ClassRepository.java
+│   │   │   │       ├── SessionRepository.java
+│   │   │   │       ├── AttendanceRepository.java
+│   │   │   │       ├── LeaveApplicationRepository.java
+│   │   │   │       └── TimetableRepository.java
+│   │   │   │
+│   │   │   ├── firebase/
+│   │   │   │   └── AuthManager.java          ← Firebase Auth wrapper
+│   │   │   │
+│   │   │   ├── location/
+│   │   │   │   ├── LocationHelper.java       ← GPS fetch (quick + multi-sample)
+│   │   │   │   └── GeoValidator.java         ← Geofence + mock location checks
+│   │   │   │
+│   │   │   ├── proxy/
+│   │   │   │   └── ProxyDetectionEngine.java ← Orchestrates all 3 anti-proxy layers
+│   │   │   │
+│   │   │   ├── qr/
+│   │   │   │   ├── QRGeneratorUtil.java      ← AES-encrypted QR bitmap generation
+│   │   │   │   ├── QRScannerUtil.java        ← CameraX + ML Kit QR decoder
+│   │   │   │   └── QRRefreshManager.java     ← 10-second nonce rotation timer
+│   │   │   │
+│   │   │   ├── security/
+│   │   │   │   ├── AESCryptoUtil.java        ← AES-256-GCM encrypt/decrypt
+│   │   │   │   ├── DeviceFingerprint.java    ← Hardware fingerprint generation
+│   │   │   │   └── NonceManager.java         ← Nonce generation and validation
+│   │   │   │
+│   │   │   ├── timetable/
+│   │   │   │   └── (timetable alarm/notification helpers)
+│   │   │   │
+│   │   │   ├── ui/
+│   │   │   │   ├── SplashActivity.java       ← Animated splash + role routing
+│   │   │   │   ├── LoginActivity.java
+│   │   │   │   ├── SignupActivity.java
+│   │   │   │   │
+│   │   │   │   ├── ── Student ──
+│   │   │   │   ├── StudentDashboardActivity.java
+│   │   │   │   ├── ScanQRActivity.java       ← Camera + proxy validation + mark
+│   │   │   │   ├── AttendanceHistoryActivity.java
+│   │   │   │   ├── SubjectAttendanceActivity.java
+│   │   │   │   ├── JoinClassActivity.java
+│   │   │   │   ├── LeaveApplicationActivity.java  ← Submit leave
+│   │   │   │   ├── MyLeavesActivity.java          ← Track leave status
+│   │   │   │   │
+│   │   │   │   ├── ── Teacher ──
+│   │   │   │   ├── TeacherDashboardActivity.java
+│   │   │   │   ├── StartSessionActivity.java      ← GPS + session config
+│   │   │   │   ├── DisplayQRActivity.java         ← Live rotating QR display
+│   │   │   │   ├── SessionAttendanceActivity.java ← Live student list
+│   │   │   │   ├── ClassSessionsActivity.java
+│   │   │   │   ├── LeaveApplicationsActivity.java ← Review + approve/reject
+│   │   │   │   ├── TimetableActivity.java
+│   │   │   │   │
+│   │   │   │   ├── ── Shared ──
+│   │   │   │   ├── SettingsActivity.java          ← Profile + device unbind
+│   │   │   │   ├── AttendanceDonutView.java        ← Custom Canvas chart
+│   │   │   │   │
+│   │   │   │   └── adapters/
+│   │   │   │       ├── AttendanceRecordAdapter.java
+│   │   │   │       ├── ClassListAdapter.java
+│   │   │   │       ├── ClassGroupAdapter.java
+│   │   │   │       ├── EnrolledClassAdapter.java
+│   │   │   │       ├── LeaveApplicationAdapter.java
+│   │   │   │       ├── SessionListAdapter.java
+│   │   │   │       ├── SubjectGroupAdapter.java
+│   │   │   │       ├── TimetableEntryAdapter.java
+│   │   │   │       └── UserListAdapter.java
+│   │   │   │
+│   │   │   └── utils/
+│   │   │       ├── Constants.java            ← All Firestore collection names + config
+│   │   │       ├── CsvExporter.java          ← Export attendance to CSV
+│   │   │       ├── SnackbarHelper.java       ← Themed success/warning/error snackbars
+│   │   │       └── ValidationResult.java     ← Proxy validation result wrapper
+│   │   │
+│   │   └── res/
+│   │       ├── layout/                       ← XML layouts for all activities
+│   │       ├── drawable/                     ← Icons, shapes, gradients
+│   │       ├── values/
+│   │       │   ├── colors.xml                ← Sapphire Precision design tokens
+│   │       │   ├── strings.xml               ← All UI strings
+│   │       │   ├── themes.xml                ← Material3 theme
+│   │       │   └── styles.xml
+│   │       └── xml/
+│   │           ├── file_paths.xml            ← FileProvider config for attachments
+│   │           ├── backup_rules.xml
+│   │           └── data_extraction_rules.xml
 │   │
-│   ├── StudentDashboardActivity.java  # Donut chart, overall %, subject list
-│   ├── AttendanceHistoryActivity.java # Filterable attendance log
-│   ├── ScanQRActivity.java            # CameraX + ML Kit + proxy validation
-│   ├── SubjectAttendanceActivity.java # Per-subject breakdown
-│   ├── JoinClassActivity.java         # Join class by 6-char code
-│   ├── LeaveApplicationActivity.java  # Submit leave (class/teacher/date)
-│   ├── MyLeavesActivity.java          # Student's leave history
-│   │
-│   ├── TeacherDashboardActivity.java  # Class cards with join codes
-│   ├── StartSessionActivity.java      # Class selector + GPS + session create
-│   ├── DisplayQRActivity.java         # Full-screen rotating QR + live count
-│   ├── SessionAttendanceActivity.java # Per-session student list + overrides
-│   ├── ClassSessionsActivity.java     # Past sessions list per class
-│   ├── LeaveApplicationsActivity.java # Teacher view — approve/reject leaves
-│   │
-│   ├── SettingsActivity.java          # Profile edit + logout
-│   │
-│   ├── AttendanceDonutView.java       # Custom Canvas donut chart widget
-│   └── adapters/                      # RecyclerView adapters
-│       ├── AttendanceRecordAdapter.java
-│       ├── ClassGroupAdapter.java
-│       ├── LeaveApplicationAdapter.java
-│       └── SessionAdapter.java
+│   └── build.gradle
 │
-├── qr/                              # QR generation & refresh
-│   ├── QRGeneratorUtil.java         # ZXing → encrypted QR bitmap
-│   └── QRRefreshManager.java        # 10-second Handler rotation
-│
-├── security/                        # Crypto & device integrity
-│   ├── AESCryptoUtil.java           # AES-256-GCM encrypt / decrypt
-│   ├── DeviceFingerprint.java       # ANDROID_ID hash + root/emulator detect
-│   └── NonceManager.java            # Generate & validate one-time nonces
-│
-├── location/                        # Geolocation
-│   └── LocationHelper.java          # Fused Location Provider wrapper
-│
-├── proxy/                           # Anti-proxy orchestration
-│   └── ProxyDetectionEngine.java    # Runs all checks → accept / reject
-│
-├── data/
-│   ├── model/                       # Firestore POJO models
-│   │   ├── Student.java
-│   │   ├── Teacher.java
-│   │   ├── ClassInfo.java
-│   │   ├── AttendanceSession.java
-│   │   ├── AttendanceRecord.java
-│   │   └── LeaveApplication.java
-│   │
-│   └── repository/                  # Firestore CRUD layer
-│       ├── StudentRepository.java
-│       ├── TeacherRepository.java
-│       ├── ClassRepository.java
-│       ├── SessionRepository.java
-│       ├── AttendanceRepository.java  # Includes auto-absent marking
-│       └── LeaveApplicationRepository.java  # Storage + Base64 fallback
-│
-├── firebase/
-│   ├── AuthManager.java             # Firebase Auth wrapper
-│   └── FCMService.java              # Push notification handler
-│
-└── utils/
-    ├── Constants.java               # App-wide constants
-    └── SnackbarHelper.java          # Styled Snackbar notifications
+├── build.gradle
+├── google-services.json                      ← Firebase config (not committed)
+└── README.md
 ```
 
 ---
 
-## Security & Proxy Prevention
+## Database Schema
 
-### Three-Layer Defence
+> **Database:** Cloud Firestore (NoSQL)  
+> **Auth:** Firebase Authentication — UID is used as document ID for users
 
-| Layer | Mechanism | Rejection Reason |
-|---|---|---|
-| **Layer 1 — Device** | SHA-256 fingerprint of `ANDROID_ID` + hardware build info; root/emulator detection | `device_mismatch` / `root_detected` |
-| **Layer 2 — Location** | Fused Location Provider geofence (50 m radius); `isFromMockProvider()` check; mock-GPS app detection | `location_mismatch` / `mock_location` |
-| **Layer 3 — QR Token** | AES-256-GCM encrypted nonce, rotates every 10 s; `studentId`-as-doc-ID prevents duplicate writes | `nonce_expired` |
+### Collection Overview
 
-### Attachment Security
-- Firebase Storage rules: students write only to their own `leaveProofs/{studentId}/` folder (max 10 MB, PDF/image only)
-- **Base64 Firestore fallback** — if Storage upload fails, file is Base64-encoded and stored inside the Firestore document (≤ 1.4 MB), ensuring the teacher can always view the file regardless of Storage rules
-
-### Modern Notifications
-All system messages use a custom `SnackbarHelper` utility replacing native Toasts:
-
-| Type | Colour | Use case |
-|---|---|---|
-| `success()` | 🟢 Green | Attendance marked, leave approved |
-| `error()` | 🔴 Red | Validation fail, rejection |
-| `warning()` | 🟡 Amber | GPS inaccurate, empty field |
-| `info()` | 🔵 Blue | Session ended, code copied |
+```
+Firestore Root
+├── students/{uid}
+├── teachers/{uid}
+│   └── timetable/{entryId}          ← subcollection
+├── classes/{classId}
+├── attendanceSessions/{sessionId}
+│   └── records/{studentId}          ← subcollection
+└── leaveApplications/{applicationId}
+```
 
 ---
 
-## Screenshots / Flow
+### `students/{uid}`
 
-### Student Flow
-```
-Login → Student Dashboard (donut chart + subject list)
-      → Scan QR → ✅ Marked / ❌ Rejected with reason
-      → Attendance History (filterable)
-      → Apply Leave (class + teacher + date + attachment)
-      → My Leaves (Approved / Rejected / Pending status)
-```
+| Field | Type | Description |
+|---|---|---|
+| `name` | String | Full name |
+| `rollNo` | String | Roll number |
+| `class` | String | Class/batch name (`@PropertyName("class")`) |
+| `email` | String | Email |
+| `phone` | String | Phone number |
+| `deviceId` | String | Primary hardware fingerprint (SHA-256) |
+| `deviceId2` | String | Optional secondary fingerprint |
+| `fcmToken` | String | FCM push token |
+| `lastUnbindDate` | String | ISO date `yyyy-MM-dd` of last device unbind |
 
-### Teacher Flow
-```
-Login → Teacher Dashboard (class cards with join codes)
-      → Start Session (class selector + GPS)
-      → Display QR (full-screen, auto-rotates every 10s, live count)
-      → End Session (auto-marks absent for non-scanners)
-      → Session Attendance (long-press → mark override)
-      → Leave Applications (tap → detail + approve/reject)
+---
+
+### `teachers/{uid}`
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | String | Full name |
+| `email` | String | Email |
+| `subject` | String | Primary subject |
+| `classroom` | String | Default room (e.g. `"Room 301"`) |
+| `fcmToken` | String | FCM push token |
+| `deviceId` | String | Current device fingerprint |
+| `activeDeviceId` | String | Set while a session runs; blocks other device logins |
+
+---
+
+### `teachers/{uid}/timetable/{entryId}`
+
+| Field | Type | Description |
+|---|---|---|
+| `teacherId` | String | Parent teacher UID |
+| `dayOfWeek` | int | 1 = Monday … 5 = Friday |
+| `subject` | String | Subject name |
+| `className` | String | Class/batch name |
+| `roomNo` | String | Room identifier |
+| `startHour` | int | 24h start hour |
+| `startMinute` | int | Start minute |
+| `endHour` | int | 24h end hour |
+| `endMinute` | int | End minute |
+| `notificationsEnabled` | boolean | Whether alarm fires |
+
+---
+
+### `classes/{classId}`
+
+| Field | Type | Description |
+|---|---|---|
+| `className` | String | Batch name (e.g. `"TY BSc CS"`) |
+| `subject` | String | Subject (e.g. `"DSA"`) |
+| `teacherId` | String | → `teachers/{uid}` |
+| `enrolledStudents` | Array\<String\> | List of student UIDs |
+| `joinCode` | String | 6-char self-enrollment code |
+
+---
+
+### `attendanceSessions/{sessionId}`
+
+| Field | Type | Description |
+|---|---|---|
+| `sessionId` | String | Auto-populated via `@DocumentId` |
+| `classId` | String | → `classes/{classId}` |
+| `className` | String | Denormalised |
+| `subject` | String | Denormalised |
+| `teacherId` | String | → `teachers/{uid}` |
+| `sessionKey` | String | AES-256 encryption key |
+| `qrCode` | String | Current encrypted QR token (rotates every 10s) |
+| `previousQrCode` | String | Previous token (6s grace window) |
+| `previousNonceExpiryMs` | long | Epoch ms when previous nonce expires |
+| `latitude` | double | Teacher GPS latitude |
+| `longitude` | double | Teacher GPS longitude |
+| `geofenceRadius` | double | Allowed radius in metres (default 100m) |
+| `startTime` | Timestamp | Session start |
+| `endTime` | Timestamp | Session end (`null` if active) |
+| `lectureStartTime` | Timestamp | Scheduled lecture start |
+| `lectureEndTime` | Timestamp | Scheduled lecture end |
+| `durationMinutes` | int | Used for auto-expiry |
+| `active` | boolean | Accepting scans? |
+
+---
+
+### `attendanceSessions/{sessionId}/records/{studentId}`
+
+> Doc ID = student UID → **guarantees one record per student per session**
+
+| Field | Type | Description |
+|---|---|---|
+| `studentId` | String | → `students/{uid}` |
+| `sessionId` | String | Parent session (denormalised) |
+| `status` | String | `"present"` \| `"rejected"` |
+| `time` | Timestamp | Marked at |
+| `deviceId` | String | Fingerprint at scan time |
+| `location` | GeoPoint | Student GPS at scan time |
+| `rejectionReason` | String | e.g. `"location_mismatch"`, `"device_mismatch"` |
+| `studentName` | String | Denormalised |
+| `studentRollNo` | String | Denormalised |
+| `subject` | String | Denormalised |
+
+---
+
+### `leaveApplications/{applicationId}`
+
+| Field | Type | Description |
+|---|---|---|
+| `applicationId` | String | Document ID |
+| `studentId` | String | → `students/{uid}` |
+| `studentName` | String | Denormalised |
+| `studentRollNo` | String | Denormalised |
+| `classId` | String | → `classes/{classId}` |
+| `className` | String | Denormalised |
+| `teacherId` | String | → `teachers/{uid}` |
+| `teacherName` | String | Denormalised |
+| `subject` | String | Subject the leave is for |
+| `leaveDate` | String | ISO date `yyyy-MM-dd` |
+| `reason` | String | Student explanation |
+| `status` | String | `"Pending"` \| `"Approved"` \| `"Rejected"` |
+| `submittedAt` | Timestamp | Submission time |
+| `attachmentUrl` | String | Firebase Storage URL (primary) |
+| `attachmentFileName` | String | Original filename |
+| `attachmentMimeType` | String | e.g. `"application/pdf"` |
+| `attachmentBase64` | String | Base64 content (fallback) |
+| `attachmentBase64MimeType` | String | MIME for base64 content |
+
+---
+
+### Entity Relationship Diagram
+
+```mermaid
+erDiagram
+    STUDENTS {
+        string uid PK
+        string name
+        string rollNo
+        string class
+        string deviceId
+        string fcmToken
+    }
+    TEACHERS {
+        string uid PK
+        string name
+        string subject
+        string classroom
+        string activeDeviceId
+    }
+    CLASSES {
+        string classId PK
+        string className
+        string subject
+        string teacherId FK
+        array enrolledStudents
+        string joinCode
+    }
+    TIMETABLE {
+        string entryId PK
+        string teacherId FK
+        int dayOfWeek
+        string subject
+        string className
+        string roomNo
+    }
+    ATTENDANCE_SESSIONS {
+        string sessionId PK
+        string classId FK
+        string teacherId FK
+        string sessionKey
+        string qrCode
+        double latitude
+        double longitude
+        double geofenceRadius
+        boolean active
+    }
+    ATTENDANCE_RECORDS {
+        string studentId PK
+        string sessionId FK
+        string status
+        geopoint location
+        string rejectionReason
+    }
+    LEAVE_APPLICATIONS {
+        string applicationId PK
+        string studentId FK
+        string classId FK
+        string teacherId FK
+        string leaveDate
+        string status
+        string attachmentUrl
+        string attachmentBase64
+    }
+
+    TEACHERS ||--o{ TIMETABLE : "has schedule"
+    TEACHERS ||--o{ CLASSES : "teaches"
+    TEACHERS ||--o{ ATTENDANCE_SESSIONS : "creates"
+    CLASSES ||--o{ ATTENDANCE_SESSIONS : "has sessions"
+    ATTENDANCE_SESSIONS ||--o{ ATTENDANCE_RECORDS : "contains"
+    STUDENTS ||--o{ ATTENDANCE_RECORDS : "marked in"
+    STUDENTS ||--o{ LEAVE_APPLICATIONS : "submits"
+    TEACHERS ||--o{ LEAVE_APPLICATIONS : "reviews"
+    CLASSES ||--o{ LEAVE_APPLICATIONS : "applies to"
 ```
 
 ---
@@ -336,91 +435,85 @@ Login → Teacher Dashboard (class cards with join codes)
 
 ### Prerequisites
 - Android Studio Hedgehog or later
-- JDK 17
-- A Firebase project with Firestore, Auth, Storage, and FCM enabled
+- Java 17+
+- A Firebase project with **Firestore**, **Authentication**, **Storage**, and **FCM** enabled
 
-### 1. Clone the repository
-```bash
-git clone https://github.com/<your-username>/qrAttend.git
-cd qrAttend
-```
+### Steps
 
-### 2. Firebase setup
-1. Create a project at [console.firebase.google.com](https://console.firebase.google.com)
-2. Enable **Authentication** (Email/Password + Google)
-3. Create a **Firestore** database in production mode
-4. Enable **Firebase Storage**
-5. Enable **Cloud Messaging**
-6. Download `google-services.json` and place it in `app/`
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/<your-username>/qrAttend.git
+   cd qrAttend
+   ```
 
-### 3. Deploy security rules
-```bash
-# Install Firebase CLI if needed
-npm install -g firebase-tools
-firebase login
+2. **Add Firebase config**  
+   Download `google-services.json` from your Firebase console and place it at:
+   ```
+   app/google-services.json
+   ```
 
-# Deploy Firestore rules
-firebase deploy --only firestore:rules
+3. **Firestore Security Rules**  
+   Set your Firestore rules to allow authenticated reads/writes (adjust for production):
+   ```
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /{document=**} {
+         allow read, write: if request.auth != null;
+       }
+     }
+   }
+   ```
 
-# Deploy Storage rules
-firebase deploy --only storage
-```
+4. **Firebase Storage Rules** (for leave attachments)
+   ```
+   rules_version = '2';
+   service firebase.storage {
+     match /b/{bucket}/o {
+       match /leaveProofs/{allPaths=**} {
+         allow read, write: if request.auth != null
+             && request.resource.size < 10 * 1024 * 1024;
+       }
+     }
+   }
+   ```
 
-### 4. Firestore indexes
-The following composite index is required for the attendance history query:
+5. **Build & Run**
+   ```bash
+   ./gradlew assembleDebug
+   # or open in Android Studio and Run
+   ```
 
-| Collection | Fields | Order |
-|---|---|---|
-| `attendanceSessions` (records subcollection group) | `studentId` ASC, `time` DESC | — |
+---
 
-Create it in the Firebase Console → Firestore → Indexes.
+## Usage
 
-### 5. Build & run
-```bash
-# Open in Android Studio and sync Gradle, then run on a physical device
-# (emulator will be rejected by the proxy detection engine)
-```
+### As a Teacher
+1. Sign up → select **Teacher** role
+2. Dashboard → **Start Session** → pick class, duration, get GPS
+3. Show the rotating QR code to students
+4. View live attendance on **Session Attendance** screen
+5. End session when done
 
-> ⚠️ **Physical device required** — the app detects emulators and rejects attendance marking from them.
-
-### 6. First-time usage
-| Role | Steps |
-|---|---|
-| **Teacher** | Sign up → select Teacher role → create a class from the dashboard |
-| **Student** | Sign up → select Student role → join a class using the 6-character join code OR scan any QR from that class to auto-enroll |
+### As a Student
+1. Sign up → select **Student** role
+2. Join a class using the teacher's **join code** (or auto-enroll on first scan)
+3. Dashboard → **Scan QR** → point camera at teacher's screen
+4. Attendance is marked if you pass all 3 security checks
+5. View your records in **Attendance History**
 
 ---
 
 ## Team
 
-| Member | Role | Responsibilities |
-|---|---|---|
-| **Member 1** | Frontend & UX Lead | All Android screens, navigation, Material Design, adapters, XML layouts |
-| **Member 2** | Core Logic & QR Lead | QR generation (ZXing), QR scanning (ML Kit), AES encryption, device fingerprinting, proxy detection engine, geolocation |
-| **Member 3** | Backend & Integration Lead | Firebase Auth, Firestore CRUD repos, Security Rules, FCM, data models, Firebase Storage |
-
----
-
-## Competitive Analysis
-
-| Feature | QR-Attend | Manual Roll | Biometric | Bluetooth Beacon |
-|---|---|---|---|---|
-| Speed | ⚡ Fast | 🐢 Slow | ⚡ Fast | ⚡ Fast |
-| Proxy Prevention | ✅ Multi-layer | ❌ None | ✅ Strong | ⚠️ Medium |
-| Hardware Cost | 💰 None (phones) | 💰 None | 💰💰💰 High | 💰💰 Medium |
-| Scalability | ✅ Cloud-native | ❌ Low | ⚠️ Medium | ⚠️ Medium |
-| Offline Support | ✅ QR gen offline | ✅ Full | ❌ None | ❌ None |
+| Role | Responsibilities |
+|---|---|
+| Member 1 — UI & Integration Lead | Activities, layouts, Firebase integration |
+| Member 2 — Core Logic & QR Lead | QR generation/scanning, CameraX, security |
+| Member 3 — Backend & Data Lead | Firestore repositories, geofencing, sessions |
 
 ---
 
 ## License
 
-This project is licensed under the MIT License — see [LICENSE](LICENSE) for details.
-
----
-
-<div align="center">
-
-Built with ❤️ using Android · Java · Firebase
-
-</div>
+This project was developed as an academic mini-project. All rights reserved by the development team.

@@ -18,6 +18,8 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.firebase.Timestamp;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.qrattend.app.R;
 import com.qrattend.app.data.model.AttendanceRecord;
@@ -31,8 +33,10 @@ import com.qrattend.app.utils.CsvExporter;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public class SessionAttendanceActivity extends AppCompatActivity {
 
@@ -50,6 +54,9 @@ public class SessionAttendanceActivity extends AppCompatActivity {
     private SessionRepository sessionRepo;
     private StudentRepository studentRepo;
     private ListenerRegistration recordsListener;
+
+    // All enrolled students (as placeholder Absent records for display)
+    private final Map<String, AttendanceRecord> enrolledPlaceholders = new HashMap<>();
 
     private Calendar filterCalendar = null;
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("dd MMM yyyy", Locale.getDefault());
@@ -102,22 +109,46 @@ public class SessionAttendanceActivity extends AppCompatActivity {
     private void loadSessionData(String sid) {
         progressBar.setVisibility(View.VISIBLE);
 
+        // Step 1: Load session info and enrolled students
         sessionRepo.getSession(sid, session -> {
-            if (session != null) {
-                String subject   = session.getSubject()   != null ? session.getSubject()   : "";
-                String className = session.getClassName() != null ? session.getClassName() : "";
-                String startStr  = session.getStartTime() != null
-                        ? new SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
-                                .format(session.getStartTime().toDate())
-                        : "";
-                String statusTag = session.isActive() ? " [Active]" : " [Ended]";
-                tvSessionInfo.setText(subject + " — " + className + "\n" + startStr + statusTag);
+            if (session == null) return;
+
+            // Update header
+            String subject   = session.getSubject()   != null ? session.getSubject()   : "";
+            String className = session.getClassName() != null ? session.getClassName() : "";
+            String startStr  = session.getStartTime() != null
+                    ? new SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
+                            .format(session.getStartTime().toDate())
+                    : "";
+            String statusTag = session.isActive() ? " [Active]" : " [Ended]";
+            runOnUiThread(() ->
+                    tvSessionInfo.setText(subject + " — " + className + "\n" + startStr + statusTag));
+
+            // Step 2: Resolve classDocId from classId (which equals className) + teacherId
+            String classId  = session.getClassId();
+            String teacherId = session.getTeacherId();
+            if (classId != null && teacherId != null) {
+                FirebaseFirestore.getInstance()
+                        .collection(Constants.CLASSES)
+                        .whereEqualTo("className", classId)
+                        .whereEqualTo("teacherId",  teacherId)
+                        .limit(1)
+                        .get()
+                        .addOnSuccessListener(qs -> {
+                            if (qs != null && !qs.isEmpty()) {
+                                DocumentSnapshot classDoc = qs.getDocuments().get(0);
+                                @SuppressWarnings("unchecked")
+                                List<String> enrolled = (List<String>) classDoc.get("enrolledStudents");
+                                if (enrolled != null) {
+                                    buildEnrolledPlaceholders(enrolled, subject, sid);
+                                }
+                            }
+                        });
             }
         });
 
-        if (recordsListener != null) {
-            recordsListener.remove();
-        }
+        // Step 3: Real-time listener for actual scan records
+        if (recordsListener != null) recordsListener.remove();
         recordsListener = attendanceRepo.listenToSessionRecords(sid, records -> {
             runOnUiThread(() -> {
                 progressBar.setVisibility(View.GONE);
@@ -125,6 +156,34 @@ public class SessionAttendanceActivity extends AppCompatActivity {
                 applyFilter();
             });
         });
+    }
+
+    /**
+     * For each enrolled student ID, fetch their name/roll and create a placeholder
+     * AttendanceRecord with status "Absent" (will be overridden by actual records in applyFilter).
+     */
+    private void buildEnrolledPlaceholders(List<String> enrolledIds, String subject, String sid) {
+        for (String studentId : enrolledIds) {
+            FirebaseFirestore.getInstance()
+                    .collection(Constants.STUDENTS)
+                    .document(studentId)
+                    .get()
+                    .addOnSuccessListener(doc -> {
+                        AttendanceRecord placeholder = new AttendanceRecord();
+                        placeholder.setStudentId(studentId);
+                        placeholder.setSessionId(sid);
+                        placeholder.setStatus(Constants.STATUS_ABSENT);
+                        placeholder.setSubject(subject);
+                        if (doc != null && doc.exists()) {
+                            placeholder.setStudentName(doc.getString("name"));
+                            placeholder.setStudentRollNo(doc.getString("rollNo"));
+                        }
+                        synchronized (enrolledPlaceholders) {
+                            enrolledPlaceholders.put(studentId, placeholder);
+                        }
+                        runOnUiThread(this::applyFilter);
+                    });
+        }
     }
 
     @Override
@@ -137,29 +196,54 @@ public class SessionAttendanceActivity extends AppCompatActivity {
     }
 
     private void applyFilter() {
-        List<AttendanceRecord> filtered = new ArrayList<>();
+        // Merge enrolled placeholders with actual scanned records.
+        // Actual records always win (student scanned → override the "Absent" placeholder).
+        Map<String, AttendanceRecord> merged = new HashMap<>();
 
+        // 1. Put all enrolled placeholders first (status = Absent)
+        synchronized (enrolledPlaceholders) {
+            merged.putAll(enrolledPlaceholders);
+        }
+
+        // 2. Override with real scanned/manual records
         for (AttendanceRecord r : allRecords) {
+            if (r.getStudentId() != null) {
+                merged.put(r.getStudentId(), r);
+            }
+        }
+
+        // 3. Apply date filter
+        List<AttendanceRecord> filtered = new ArrayList<>();
+        for (AttendanceRecord r : merged.values()) {
             if (filterCalendar == null) {
                 filtered.add(r);
             } else {
                 if (r.getTime() != null) {
                     Calendar recCal = Calendar.getInstance();
                     recCal.setTime(r.getTime().toDate());
-                    if (recCal.get(Calendar.YEAR)         == filterCalendar.get(Calendar.YEAR)
-                            && recCal.get(Calendar.MONTH) == filterCalendar.get(Calendar.MONTH)
+                    if (recCal.get(Calendar.YEAR)          == filterCalendar.get(Calendar.YEAR)
+                            && recCal.get(Calendar.MONTH)  == filterCalendar.get(Calendar.MONTH)
                             && recCal.get(Calendar.DAY_OF_MONTH) == filterCalendar.get(Calendar.DAY_OF_MONTH)) {
                         filtered.add(r);
                     }
+                } else if (filterCalendar == null) {
+                    filtered.add(r); // absent placeholders have no time — show always when no filter
                 }
             }
         }
+
+        // Sort: Present first, then Leave, then Absent at the bottom
+        filtered.sort((a, b) -> {
+            int rankA = statusRank(a.getStatus());
+            int rankB = statusRank(b.getStatus());
+            return Integer.compare(rankA, rankB);
+        });
 
         if (filtered.isEmpty()) {
             tvEmpty.setVisibility(View.VISIBLE);
             tvEmpty.setText(filterCalendar != null
                     ? "No records on " + dateFormat.format(filterCalendar.getTime())
-                    : "No records found for this session.");
+                    : "No enrolled students found.");
             rvRecords.setVisibility(View.GONE);
         } else {
             tvEmpty.setVisibility(View.GONE);
@@ -169,14 +253,30 @@ public class SessionAttendanceActivity extends AppCompatActivity {
 
         currentFilteredRecords = filtered;
 
+        // Stats: total = all enrolled, present = those who actually scanned
         int total   = filtered.size();
         int present = 0;
+        int absent  = 0;
         for (AttendanceRecord r : filtered) {
             if (Constants.STATUS_PRESENT.equals(r.getStatus()) || "Present".equals(r.getStatus()))
                 present++;
+            else if (Constants.STATUS_ABSENT.equals(r.getStatus()) || "Absent".equals(r.getStatus()))
+                absent++;
         }
         tvTotalRecords.setText(getString(R.string.total_records, total));
-        tvPresentRecords.setText(getString(R.string.present_records, present));
+        tvPresentRecords.setText(getString(R.string.present_records, present)
+                + "  |  Absent: " + absent);
+    }
+
+    /** Present=0, Leave=1, Rejected=2, Absent=3 — so absent students sink to bottom */
+    private int statusRank(String status) {
+        if (status == null) return 3;
+        switch (status) {
+            case "Present":  return 0;
+            case "Leave":    return 1;
+            case "Rejected": return 2;
+            default:         return 3; // Absent
+        }
     }
 
     private void showDatePicker() {
